@@ -1,0 +1,253 @@
+/* ── 首页：手机版布局 ── */
+
+.page-container {
+  min-height: 100vh;
+  background: #fff;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── 加载状态 ── */
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #43a047;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* ── Banner 轮播 ── */
+.banner-swiper {
+  width: 100%;
+  height: 52vw;
+  min-height: 200px;
+}
+
+.banner-img {
+  width: 100%;
+  height: 100%;
+}
+
+.banner-placeholder {
+  width: 100%;
+  height: 52vw;
+  min-height: 200px;
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-text {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ── 通用 Section ── */
+.section {
+  padding: 32px 0;
+}
+
+.section-inner {
+  padding: 0 16px;
+}
+
+.section-title {
+  display: block;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.section-subtitle {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+/* ── 为什么选择我们 ── */
+.why-section {
+  background: #f5f6fa;
+}
+
+.why-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.why-heading {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+.why-para {
+  display: block;
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+
+/* ── 师资力量 ── */
+.teacher-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.teacher-list {
+  display: inline-flex;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.teacher-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 140px;
+  padding: 20px 12px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+.teacher-avatar-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, #a5d6a7, #43a047);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teacher-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.teacher-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.teacher-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.teacher-title {
+  font-size: 12px;
+  color: #43a047;
+  margin-bottom: 6px;
+}
+
+.teacher-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+  white-space: normal;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── 学员照片墙 ── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.gallery-item {
+  position: relative;
+  padding-top: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.gallery-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── 页脚 ── */
+.page-footer {
+  background: #0f172a;
+  padding: 32px 20px 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.footer-brand {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.footer-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footer-note {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: #64748b;
+}

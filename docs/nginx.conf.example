@@ -1,0 +1,43 @@
+# Nginx 反向代理配置
+# 文件路径：/etc/nginx/sites-available/danci007web
+# 启用：sudo ln -s /etc/nginx/sites-available/danci007web /etc/nginx/sites-enabled/
+# 重载：sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;  # ← 改成你的域名
+
+    # 上传文件大小限制
+    client_max_body_size 20M;
+
+    # 所有请求转发给 Node.js
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 60s;
+    }
+
+    # 上传文件直接由 Nginx 提供（绕过 Node，更快）
+    location /uploads/ {
+        alias /var/www/danci007web/backend/uploads/;  # ← 改成实际路径
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # 静态资源缓存
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|webp|svg|woff2?)$ {
+        proxy_pass http://127.0.0.1:3001;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+}
+
+# HTTPS（用 certbot 自动生成后会自动追加这段）
+# sudo certbot --nginx -d your-domain.com -d www.your-domain.com

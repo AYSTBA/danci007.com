@@ -1,0 +1,52 @@
+# ──────────────────────────────────────────
+# Stage 1: 构建前端
+# ──────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 只复制 package 文件先安装依赖（利用 Docker 缓存层）
+COPY package.json package-lock.json* ./
+RUN npm ci --ignore-scripts
+
+# 复制源码并构建
+COPY . .
+RUN npm run build
+
+# ──────────────────────────────────────────
+# Stage 2: 生产运行时
+# ──────────────────────────────────────────
+FROM node:20-alpine AS runner
+
+# 安装 better-sqlite3 和 sharp 所需的原生编译依赖
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    libc6-compat \
+    vips-dev
+
+WORKDIR /app
+
+# 复制 package 文件，只安装生产依赖（在 alpine 里原生编译）
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# 从构建阶段复制打包好的前端
+COPY --from=builder /app/dist ./dist
+
+# 复制后端代码
+COPY backend/server.js ./backend/server.js
+
+# 创建数据目录（持久化卷挂载点）
+RUN mkdir -p /app/backend/data /app/backend/uploads
+
+# 设置文件权限
+RUN chown -R node:node /app
+USER node
+
+# 暴露端口
+EXPOSE 3001
+
+# 启动
+CMD ["node", "backend/server.js"]

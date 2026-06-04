@@ -1,0 +1,73 @@
+<view class="about-page">
+  <!-- 加载 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- Banner 轮播 -->
+    <swiper
+      class="banner-swiper"
+      current="{{currentBanner}}"
+      bindchange="onBannerChange"
+      autoplay="{{false}}"
+      circular
+      indicator-dots
+      indicator-color="rgba(255,255,255,0.4)"
+      indicator-active-color="#ffffff"
+    >
+      <swiper-item wx:for="{{banners}}" wx:key="id">
+        <image class="banner-img" src="{{item.imageUrl}}" mode="aspectFill" />
+      </swiper-item>
+    </swiper>
+
+    <view class="banner-placeholder" wx:if="{{banners.length === 0}}">
+      <text>活动展示</text>
+    </view>
+
+    <!-- 品牌介绍 -->
+    <view class="intro-section">
+      <text class="intro-title">{{siteName}}</text>
+      <text class="intro-slogan">让每个孩子都能轻松学好英语</text>
+      <text class="intro-desc">中萱文化（原单词突击007）是一家深耕AI智能英语教育领域十年的专业机构，以德国心理学家赫尔曼·艾宾浩斯的遗忘曲线理论为基石，深度融合大数据、AI人工智能与遗传学算法，为全国中小学生提供精准化、个性化的英语单词学习解决方案。</text>
+      <text class="intro-desc">系统采用线上AI智能训练+线下专业老师指导的OMO双轨教学模式，涵盖全方位语音识别、多维度语音测评、高精准度语音纠错及AI智能MRS记忆雷达系统，覆盖单词、词组、短语、句子、作文等全维度英语学习。</text>
+    </view>
+
+    <!-- 数据统计 -->
+    <view class="stats-section">
+      <text class="section-title">数据说话</text>
+      <view class="stats-grid">
+        <view class="stat-card" wx:for="{{stats}}" wx:key="label">
+          <text class="stat-value">{{item.value}}</text>
+          <text class="stat-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 课程特色 -->
+    <view class="features-section">
+      <text class="section-title">课程特色</text>
+      <view class="features-grid">
+        <view class="feature-card" wx:for="{{features}}" wx:key="id">
+          <text class="feature-title">{{item.title}}</text>
+          <text class="feature-desc">{{item.desc}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 使命 -->
+    <view class="mission-section">
+      <view class="mission-card">
+        <text class="mission-title">我们的使命</text>
+        <text class="mission-desc">致力于通过最科学的记忆方法与最前沿的AI技术，帮助每一位学生轻松掌握英语单词、提升英语能力。十年技术沉淀，1800万+学员验证，我们坚信：每个孩子都有学好英语的潜力，而科学的工具与方法能让这一过程事半功倍。</text>
+      </view>
+    </view>
+
+    <!-- 页脚 -->
+    <view class="about-footer">
+      <text class="footer-brand">{{siteName}}</text>
+      <text class="footer-note">{{siteNote}}</text>
+    </view>
+  </block>
+</view>

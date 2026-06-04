@@ -1,0 +1,895 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import ImageEditor from '../components/ImageEditor.vue';
+import type { BookingData, Banner, Teacher, PageContents } from '../types';
+import { normalizeActive } from '../types';
+import { getImageUrl, formatDate, fetchJson } from '../utils';
+
+const teachers = ref<Teacher[]>([]);
+const isLoggedIn = ref(false);
+const password = ref('');
+const errorMsg = ref('');
+const loginLoading = ref(false);
+
+const bookings = ref<BookingData[]>([]);
+const filterName = ref('');
+const filterDate = ref('');
+const showModal = ref(false);
+const selectedBooking = ref<BookingData | null>(null);
+
+const banners = ref<Banner[]>([]);
+const pageContents = ref<PageContents>({});
+
+const activeTab = ref('banners');
+const saveMessage = ref('');
+const showSaveMessage = ref(false);
+
+const editorVisible = ref(false);
+const editorFile = ref<File | null>(null);
+const editorCallback = ref<((file: File) => void) | null>(null);
+
+// 互动管理
+const courseReviews = ref<any[]>([]);
+const courseInteractions = ref<any[]>([]);
+
+const dataLoading = ref(false);
+const dataError = ref<string | null>(null);
+
+const showSaveSuccess = (message: string) => {
+  saveMessage.value = message;
+  showSaveMessage.value = true;
+  setTimeout(() => {
+    showSaveMessage.value = false;
+  }, 3000);
+};
+
+// ── 登录：通过后端 API 验证密码 ──
+const handleLogin = async () => {
+  if (!password.value) return;
+  loginLoading.value = true;
+  errorMsg.value = '';
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password.value })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // 后端返回 token，存储到 sessionStorage
+      sessionStorage.setItem('adminToken', data.token);
+      sessionStorage.setItem('adminLoggedIn', 'true');
+      isLoggedIn.value = true;
+      password.value = '';
+      loadData();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      errorMsg.value = data.error || '密码错误';
+    }
+  } catch {
+    errorMsg.value = '网络错误，请重试';
+  } finally {
+    loginLoading.value = false;
+  }
+};
+
+const checkLogin = () => {
+  const token = sessionStorage.getItem('adminToken');
+  if (token) {
+    isLoggedIn.value = true;
+  }
+};
+
+const handleLogout = () => {
+  isLoggedIn.value = false;
+  sessionStorage.removeItem('adminLoggedIn');
+  sessionStorage.removeItem('adminToken');
+  password.value = '';
+};
+
+// ── 数据加载（带鉴权 token）──
+const getAuthHeaders = () => {
+  const token = sessionStorage.getItem('adminToken');
+  return token ? { 'X-Admin-Token': token } : {};
+};
+
+const loadData = async () => {
+  dataLoading.value = true;
+  dataError.value = null;
+  try {
+    const headers = getAuthHeaders();
+    const [bookingsData, bannerData, contents, teacherData, reviewsData, interactionsData] = await Promise.all([
+      fetchJson<BookingData[]>('/api/bookings', { headers }),
+      fetchJson<Banner[]>('/api/admin/banners', { headers }),
+      fetchJson<PageContents>('/api/pages/home/contents', { headers }),
+      fetchJson<Teacher[]>('/api/teachers', { headers }),
+      fetchJson<any[]>('/api/admin/course-reviews', { headers }),
+      fetchJson<any[]>('/api/admin/course-interactions', { headers })
+    ]);
+
+    bookings.value = bookingsData;
+    banners.value = bannerData.map((b: any) => ({ ...b, active: normalizeActive(b.active) }));
+    pageContents.value = contents;
+    teachers.value = teacherData.map((t: any) => ({ ...t, active: normalizeActive(t.active) }));
+    courseReviews.value = reviewsData;
+    courseInteractions.value = interactionsData;
+  } catch (e: any) {
+    // 如果鉴权失败，自动登出
+    if (e.message?.includes('401') || e.message?.includes('403')) {
+      handleLogout();
+      return;
+    }
+    dataError.value = e.message || '数据加载失败';
+  } finally {
+    dataLoading.value = false;
+  }
+};
+
+const authFetch = async (url: string, options: RequestInit = {}) => {
+  const headers = { ...getAuthHeaders(), ...options.headers };
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401 || res.status === 403) {
+    handleLogout();
+    throw new Error('登录已过期，请重新登录');
+  }
+  return res;
+};
+
+const addTeacher = () => {
+  teachers.value.push({
+    id: Date.now(),
+    name: '新教师',
+    name_en: '',
+    title: '',
+    title_en: '',
+    description: '',
+    description_en: '',
+    avatar: '',
+    active: true,
+    sort_order: teachers.value.length
+  });
+};
+
+const saveTeacher = async (teacher: Teacher) => {
+  try {
+    const teacherData = { ...teacher, active: teacher.active ? 1 : 0 };
+    let response;
+    if (teacher.id > 1000000000000) {
+      response = await authFetch('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(teacherData)
+      });
+      if (response.ok) {
+        const saved = await response.json();
+        teacher.id = saved.id;
+        showSaveSuccess('教师信息已保存');
+      } else {
+        alert('保存失败，请重试');
+      }
+    } else {
+      response = await authFetch(`/api/teachers/${teacher.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(teacherData)
+      });
+      if (response.ok) {
+        showSaveSuccess('教师信息已更新');
+      } else {
+        alert('更新失败，请重试');
+      }
+    }
+  } catch (error: any) {
+    if (!error.message.includes('登录已过期')) alert('保存出错，请重试');
+  }
+};
+
+const removeTeacher = (teacher: Teacher) => {
+  if (confirm('确定要删除这位教师吗？')) {
+    teachers.value = teachers.value.filter(t => t.id !== teacher.id);
+    if (teacher.id <= 1000000000000) {
+      authFetch(`/api/teachers/${teacher.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+};
+
+const editorAspectRatio = ref<'square' | 'circle' | 'free'>('free');
+
+const handleTeacherAvatarUpload = (event: Event, teacher: Teacher) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    editorAspectRatio.value = 'circle';
+    editorFile.value = file;
+    editorCallback.value = async (editedFile: File) => {
+      const url = await uploadImage(editedFile);
+      if (url) teacher.avatar = url;
+    };
+    editorVisible.value = true;
+  }
+};
+
+const handleFileUpload = (event: Event, banner: Banner, lang: string) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    editorAspectRatio.value = 'free';
+    editorFile.value = file;
+    editorCallback.value = async (editedFile: File) => {
+      const url = await uploadImage(editedFile);
+      if (url) {
+        if (lang === 'en') banner.image_url_en = url;
+        else banner.image_url = url;
+      }
+    };
+    editorVisible.value = true;
+  }
+};
+
+const handleWechatQRUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    editorAspectRatio.value = 'square';
+    editorFile.value = file;
+    editorCallback.value = async (editedFile: File) => {
+      const url = await uploadImage(editedFile);
+      if (url) updateContent('wechat_qrcode', url);
+    };
+    editorVisible.value = true;
+  }
+};
+
+const deleteBooking = async (id: number) => {
+  if (confirm('确定要删除这条预约记录吗？')) {
+    try {
+      await authFetch(`/api/bookings/${id}`, { method: 'DELETE' });
+      bookings.value = bookings.value.filter(b => b.id !== id);
+    } catch {}
+  }
+};
+
+const deleteReview = async (id: number) => {
+  if (confirm('确定要删除这条评价吗？')) {
+    try {
+      await authFetch(`/api/course-reviews/${id}`, { method: 'DELETE' });
+      courseReviews.value = courseReviews.value.filter(r => r.id !== id);
+    } catch {}
+  }
+};
+
+const deleteInteraction = async (id: number) => {
+  if (confirm('确定要删除这条互动吗？')) {
+    try {
+      await authFetch(`/api/course-interactions/${id}`, { method: 'DELETE' });
+      courseInteractions.value = courseInteractions.value.filter(i => i.id !== id);
+    } catch {}
+  }
+};
+
+const viewDetail = (booking: BookingData) => {
+  selectedBooking.value = booking;
+  showModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+  selectedBooking.value = null;
+};
+
+const filteredBookings = () => {
+  return bookings.value.filter(booking => {
+    const matchName = !filterName.value || booking.name.includes(filterName.value);
+    const matchDate = !filterDate.value || booking.date === filterDate.value;
+    return matchName && matchDate;
+  });
+};
+
+const addBanner = () => {
+  banners.value.push({
+    id: Date.now(),
+    title: '新活动',
+    title_en: '',
+    image_url: '',
+    image_url_en: '',
+    link: '',
+    active: true,
+    sort_order: banners.value.length
+  });
+};
+
+const saveBanner = async (banner: Banner) => {
+  try {
+    const bannerData = { ...banner, active: banner.active ? 1 : 0 };
+    let response;
+    if (banner.id > 1000000000000) {
+      response = await authFetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bannerData)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        banner.id = result.id;
+        showSaveSuccess('Banner已保存');
+      } else {
+        alert('保存失败，请重试');
+      }
+    } else {
+      response = await authFetch(`/api/banners/${banner.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bannerData)
+      });
+      if (response.ok) {
+        showSaveSuccess('Banner已更新');
+      } else {
+        alert('更新失败，请重试');
+      }
+    }
+  } catch (error: any) {
+    if (!error.message.includes('登录已过期')) alert('保存出错，请重试');
+  }
+};
+
+const removeBanner = (banner: Banner) => {
+  if (confirm('确定要删除这个Banner吗？')) {
+    banners.value = banners.value.filter(b => b.id !== banner.id);
+    if (banner.id <= 1000000000000) {
+      authFetch(`/api/banners/${banner.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+};
+
+const uploadImage = async (file: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await authFetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (response.ok) {
+      const result = await response.json();
+      return result.url;
+    } else {
+      alert('上传失败，请重试');
+      return null;
+    }
+  } catch {
+    alert('上传出错，请重试');
+    return null;
+  }
+};
+
+const getContent = (key: string): string => pageContents.value[key] || '';
+
+const updateContent = (key: string, value: string) => {
+  pageContents.value[key] = value;
+};
+
+const saveAllContents = async () => {
+  try {
+    await authFetch('/api/pages/home/contents', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pageContents.value)
+    });
+    showSaveSuccess('所有设置保存成功！');
+  } catch (error: any) {
+    if (!error.message.includes('登录已过期')) alert('保存失败，请重试');
+  }
+};
+
+const handleMarkdownUploadSimple = (event: Event, key: string) => {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => updateContent(key, e.target?.result as string);
+    reader.readAsText(target.files[0]);
+  }
+};
+
+const handleEditorConfirm = async (file: File) => {
+  if (editorCallback.value) await editorCallback.value(file);
+  editorVisible.value = false;
+  editorFile.value = null;
+  editorCallback.value = null;
+};
+
+const handleEditorCancel = () => {
+  editorVisible.value = false;
+  editorFile.value = null;
+  editorCallback.value = null;
+};
+
+onMounted(() => {
+  checkLogin();
+  if (isLoggedIn.value) loadData();
+});
+</script>
+
+<template>
+  <div class="admin-page">
+    <div v-if="!isLoggedIn" class="login-container">
+      <div class="login-box">
+        <h2>管理后台登录</h2>
+        <p class="login-hint">请输入管理员密码</p>
+        <input
+          v-model="password"
+          type="password"
+          placeholder="输入密码..."
+          @keyup.enter="handleLogin"
+          :disabled="loginLoading"
+        />
+        <button @click="handleLogin" :disabled="loginLoading">
+          {{ loginLoading ? '登录中...' : '登录' }}
+        </button>
+        <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
+      </div>
+    </div>
+
+    <template v-else>
+      <section class="page-header">
+        <div class="container">
+          <div class="header-flex">
+            <div>
+              <h1>管理后台</h1>
+              <p>深圳市龙岗区教学点</p>
+            </div>
+            <button class="logout-btn" @click="handleLogout">退出登录</button>
+          </div>
+          <div v-if="showSaveMessage" class="save-success">✓ {{ saveMessage }}</div>
+        </div>
+      </section>
+
+      <!-- Loading -->
+      <div v-if="dataLoading" class="global-loading" style="min-height:40vh">
+        <div class="spinner"></div>
+        <span class="loading-text">加载中...</span>
+      </div>
+
+      <!-- Error -->
+      <div v-else-if="dataError" class="global-error" style="min-height:30vh">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">数据加载失败</div>
+        <div class="error-message">{{ dataError }}</div>
+        <button class="error-retry-btn" @click="loadData">重新加载</button>
+      </div>
+
+      <section v-else class="admin-content">
+        <div class="container">
+          <div class="tabs">
+            <button :class="['tab', { active: activeTab === 'banners' }]" @click="activeTab = 'banners'">活动Banner管理</button>
+            <button :class="['tab', { active: activeTab === 'contents' }]" @click="activeTab = 'contents'">页面内容编辑</button>
+            <button :class="['tab', { active: activeTab === 'bookings' }]" @click="activeTab = 'bookings'">预约记录</button>
+            <button :class="['tab', { active: activeTab === 'teachers' }]" @click="activeTab = 'teachers'">师资力量管理</button>
+            <button :class="['tab', { active: activeTab === 'reviews' }]" @click="activeTab = 'reviews'">课程评价</button>
+            <button :class="['tab', { active: activeTab === 'interactions' }]" @click="activeTab = 'interactions'">课程互动</button>
+          </div>
+
+          <!-- Banners Tab -->
+          <div v-show="activeTab === 'banners'" class="tab-content">
+            <div class="banners-list">
+              <div v-for="banner in banners" :key="banner.id" class="banner-item">
+                <div class="banner-fields">
+                  <div class="field-group">
+                    <label>标题 (中文)</label>
+                    <input :value="banner.title" @input="banner.title = ($event.target as HTMLInputElement).value" placeholder="活动标题" />
+                  </div>
+                  <div class="field-group">
+                    <label>标题 (English)</label>
+                    <input :value="banner.title_en" @input="banner.title_en = ($event.target as HTMLInputElement).value" placeholder="Activity Title" />
+                  </div>
+                  <div class="field-group lang-group">
+                    <label>中文图片</label>
+                    <div class="image-upload">
+                      <input type="file" @change="handleFileUpload($event, banner, 'zh')" accept="image/*" />
+                      <img v-if="banner.image_url" :src="getImageUrl(banner.image_url)" alt="中文预览" class="preview-img" />
+                    </div>
+                    <input :value="banner.image_url" @input="banner.image_url = ($event.target as HTMLInputElement).value" placeholder="中文图片URL" />
+                  </div>
+                  <div class="field-group lang-group">
+                    <label>英文图片</label>
+                    <div class="image-upload">
+                      <input type="file" @change="handleFileUpload($event, banner, 'en')" accept="image/*" />
+                      <img v-if="banner.image_url_en" :src="getImageUrl(banner.image_url_en)" alt="英文预览" class="preview-img" />
+                    </div>
+                    <input :value="banner.image_url_en" @input="banner.image_url_en = ($event.target as HTMLInputElement).value" placeholder="English Image URL" />
+                  </div>
+                  <div class="field-group">
+                    <label>链接</label>
+                    <input :value="banner.link" @input="banner.link = ($event.target as HTMLInputElement).value" placeholder="跳转链接" />
+                  </div>
+                  <div class="field-group">
+                    <label>显示顺序</label>
+                    <input type="number" :value="banner.sort_order" @input="banner.sort_order = Number(($event.target as HTMLInputElement).value)" />
+                  </div>
+                  <div class="field-group">
+                    <label class="checkbox-label">
+                      <input type="checkbox" :checked="!!banner.active" @change="banner.active = ($event.target as HTMLInputElement).checked" />
+                      显示
+                    </label>
+                  </div>
+                </div>
+                <div class="banner-actions">
+                  <button class="btn-save" @click="saveBanner(banner)">保存</button>
+                  <button class="btn-delete" @click="removeBanner(banner)">删除</button>
+                </div>
+              </div>
+            </div>
+            <button class="btn-add" @click="addBanner()">+ 添加活动</button>
+          </div>
+
+          <!-- Contents Tab -->
+          <div v-show="activeTab === 'contents'" class="tab-content">
+            <div class="simple-contents">
+              <h3>基本信息设置</h3>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>网站名称</label>
+                  <input :value="getContent('site_name')" @input="updateContent('site_name', ($event.target as HTMLInputElement).value)" placeholder="中萱文化" />
+                </div>
+                <div class="content-item-simple">
+                  <label>网站名称 (English)</label>
+                  <input :value="getContent('site_name_en')" @input="updateContent('site_name_en', ($event.target as HTMLInputElement).value)" placeholder="Zhongxuan Culture" />
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>网站名称说明</label>
+                  <input :value="getContent('site_note')" @input="updateContent('site_note', ($event.target as HTMLInputElement).value)" placeholder="中萱百日学通文化的简称" />
+                </div>
+                <div class="content-item-simple">
+                  <label>网站名称说明 (English)</label>
+                  <input :value="getContent('site_note_en')" @input="updateContent('site_note_en', ($event.target as HTMLInputElement).value)" placeholder="Abbreviation for Zhongxuan Bairixuetong Culture" />
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>联系电话</label>
+                  <input :value="getContent('contact_phone')" @input="updateContent('contact_phone', ($event.target as HTMLInputElement).value)" placeholder="400-090-3299" />
+                </div>
+                <div class="content-item-simple">
+                  <label>邮箱</label>
+                  <input :value="getContent('contact_email')" @input="updateContent('contact_email', ($event.target as HTMLInputElement).value)" placeholder="contact@example.com" />
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>地址</label>
+                  <input :value="getContent('contact_address')" @input="updateContent('contact_address', ($event.target as HTMLInputElement).value)" placeholder="深圳市龙岗区" />
+                </div>
+                <div class="content-item-simple">
+                  <label>地址 (English)</label>
+                  <input :value="getContent('contact_address_en')" @input="updateContent('contact_address_en', ($event.target as HTMLInputElement).value)" placeholder="Longgang District, Shenzhen" />
+                </div>
+              </div>
+
+              <h3>联系页面设置</h3>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>微信二维码</label>
+                  <div class="image-upload">
+                    <input type="file" @change="handleWechatQRUpload($event)" accept="image/*" />
+                    <img v-if="getContent('wechat_qrcode')" :src="getImageUrl(getContent('wechat_qrcode'))" alt="微信二维码" class="preview-img" />
+                  </div>
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>轮播文字 (用逗号分隔)</label>
+                  <input :value="getContent('booking_rotating_texts')" @input="updateContent('booking_rotating_texts', ($event.target as HTMLInputElement).value)" placeholder="专业的师资团队,科学的学习方法" />
+                </div>
+                <div class="content-item-simple">
+                  <label>轮播文字 (English)</label>
+                  <input :value="getContent('booking_rotating_texts_en')" @input="updateContent('booking_rotating_texts_en', ($event.target as HTMLInputElement).value)" placeholder="Professional teachers,Scientific learning methods" />
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple">
+                  <label>工作日营业时间</label>
+                  <input :value="getContent('business_hours_weekday')" @input="updateContent('business_hours_weekday', ($event.target as HTMLInputElement).value)" placeholder="9:00 - 21:00" />
+                </div>
+                <div class="content-item-simple">
+                  <label>周末营业时间</label>
+                  <input :value="getContent('business_hours_weekend')" @input="updateContent('business_hours_weekend', ($event.target as HTMLInputElement).value)" placeholder="10:00 - 18:00" />
+                </div>
+              </div>
+
+              <h3>为什么选择我们</h3>
+              <div class="content-row">
+                <div class="content-item-simple full">
+                  <label>为什么选择我们 (Markdown)</label>
+                  <div class="markdown-upload">
+                    <textarea :value="getContent('why_content')" @input="updateContent('why_content', ($event.target as HTMLTextAreaElement).value)" rows="8" placeholder="输入Markdown格式的内容..."></textarea>
+                    <input type="file" accept=".md,.txt" @change="handleMarkdownUploadSimple($event, 'why_content')" />
+                  </div>
+                </div>
+              </div>
+              <div class="content-row">
+                <div class="content-item-simple full">
+                  <label>Why Choose Us (English Markdown)</label>
+                  <div class="markdown-upload">
+                    <textarea :value="getContent('why_content_en')" @input="updateContent('why_content_en', ($event.target as HTMLTextAreaElement).value)" rows="8" placeholder="Enter content in Markdown format..."></textarea>
+                    <input type="file" accept=".md,.txt" @change="handleMarkdownUploadSimple($event, 'why_content_en')" />
+                  </div>
+                </div>
+              </div>
+              <button class="btn-save" @click="saveAllContents">保存所有设置</button>
+            </div>
+          </div>
+
+          <!-- Bookings Tab -->
+          <div v-show="activeTab === 'bookings'" class="tab-content">
+            <div class="bookings-filter">
+              <input v-model="filterName" placeholder="按姓名筛选..." />
+              <input v-model="filterDate" type="date" placeholder="按日期筛选..." />
+            </div>
+            <div class="bookings-list">
+              <table>
+                <thead>
+                  <tr>
+                    <th>姓名</th><th>电话</th><th>邮箱</th><th>日期</th><th>时间</th><th>课程</th><th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="booking in filteredBookings()" :key="booking.id">
+                    <td>{{ booking.name }}</td><td>{{ booking.phone }}</td><td>{{ booking.email }}</td>
+                    <td>{{ formatDate(booking.date) }}</td><td>{{ booking.time }}</td><td>{{ booking.course }}</td>
+                    <td>
+                      <button class="btn-view" @click="viewDetail(booking)">查看</button>
+                      <button class="btn-delete" @click="deleteBooking(booking.id)">删除</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="filteredBookings().length === 0" class="empty-state"><p>暂无预约记录</p></div>
+            </div>
+          </div>
+
+          <!-- Teachers Tab -->
+          <div v-show="activeTab === 'teachers'" class="tab-content">
+            <div class="teachers-settings">
+              <div class="setting-info">
+                <span class="teacher-count">当前教师数量：{{ teachers.length }} / 最多10个</span>
+              </div>
+            </div>
+            <div class="teachers-list">
+              <div v-for="teacher in teachers" :key="teacher.id" class="teacher-item">
+                <div class="teacher-fields">
+                  <div class="field-group avatar-group">
+                    <label>头像</label>
+                    <div class="avatar-upload">
+                      <input type="file" @change="handleTeacherAvatarUpload($event, teacher)" accept="image/*" />
+                      <img v-if="teacher.avatar" :src="getImageUrl(teacher.avatar)" alt="教师头像" class="avatar-preview" />
+                      <div v-else class="avatar-placeholder">点击上传头像</div>
+                    </div>
+                  </div>
+                  <div class="field-group"><label>姓名</label><input :value="teacher.name" @input="teacher.name = ($event.target as HTMLInputElement).value" placeholder="教师姓名" /></div>
+                  <div class="field-group"><label>姓名 (English)</label><input :value="teacher.name_en" @input="teacher.name_en = ($event.target as HTMLInputElement).value" placeholder="Teacher Name" /></div>
+                  <div class="field-group"><label>职称</label><input :value="teacher.title" @input="teacher.title = ($event.target as HTMLInputElement).value" placeholder="高级英语教师" /></div>
+                  <div class="field-group"><label>职称 (English)</label><input :value="teacher.title_en" @input="teacher.title_en = ($event.target as HTMLInputElement).value" placeholder="Senior English Teacher" /></div>
+                  <div class="field-group"><label>简介</label><textarea :value="teacher.description" @input="teacher.description = ($event.target as HTMLTextAreaElement).value" rows="3" placeholder="教师简介..."></textarea></div>
+                  <div class="field-group"><label>简介 (English)</label><textarea :value="teacher.description_en" @input="teacher.description_en = ($event.target as HTMLTextAreaElement).value" rows="3" placeholder="Teacher description..."></textarea></div>
+                  <div class="field-group"><label class="checkbox-label"><input type="checkbox" :checked="teacher.active" @change="teacher.active = ($event.target as HTMLInputElement).checked" />显示</label></div>
+                </div>
+                <div class="teacher-actions">
+                  <button class="btn-save" @click="saveTeacher(teacher)">保存</button>
+                  <button class="btn-delete" @click="removeTeacher(teacher)">删除</button>
+                </div>
+              </div>
+            </div>
+            <button class="btn-add" @click="addTeacher()" :disabled="teachers.length >= 10">+ 添加教师</button>
+          </div>
+
+          <!-- Reviews Tab -->
+          <div v-show="activeTab === 'reviews'" class="tab-content">
+            <div class="bookings-list">
+              <div v-if="courseReviews.length === 0" class="empty-state"><p>暂无评价记录</p></div>
+              <div v-for="review in courseReviews" :key="review.id" class="banner-item">
+                <div class="banner-fields">
+                  <div class="field-group"><label>课程ID</label><input :value="review.course_id" readonly /></div>
+                  <div class="field-group"><label>用户名</label><input :value="review.name" readonly /></div>
+                  <div class="field-group"><label>评分</label><input :value="'★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)" readonly /></div>
+                  <div class="field-group"><label>时间</label><input :value="new Date(review.created_at).toLocaleString('zh-CN')" readonly /></div>
+                  <div class="field-group full"><label>评价内容</label><textarea :value="review.content" readonly rows="2"></textarea></div>
+                </div>
+                <div class="banner-actions"><button class="btn-delete" @click="deleteReview(review.id)">删除</button></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactions Tab -->
+          <div v-show="activeTab === 'interactions'" class="tab-content">
+            <div class="bookings-list">
+              <div v-if="courseInteractions.length === 0" class="empty-state"><p>暂无互动记录</p></div>
+              <div v-for="item in courseInteractions" :key="item.id" class="banner-item">
+                <div class="banner-fields">
+                  <div class="field-group"><label>课程ID</label><input :value="item.course_id" readonly /></div>
+                  <div class="field-group"><label>用户名</label><input :value="item.name" readonly /></div>
+                  <div class="field-group"><label>时间</label><input :value="new Date(item.created_at).toLocaleString('zh-CN')" readonly /></div>
+                  <div class="field-group full"><label>互动内容</label><textarea :value="item.content" readonly rows="2"></textarea></div>
+                </div>
+                <div class="banner-actions"><button class="btn-delete" @click="deleteInteraction(item.id)">删除</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Modal -->
+      <div v-if="showModal" class="modal-overlay" @click="closeModal">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h3>预约详情</h3>
+            <button @click="closeModal">×</button>
+          </div>
+          <div class="modal-body" v-if="selectedBooking">
+            <div class="detail-row"><span class="label">姓名:</span><span>{{ selectedBooking.name }}</span></div>
+            <div class="detail-row"><span class="label">电话:</span><span>{{ selectedBooking.phone }}</span></div>
+            <div class="detail-row" v-if="selectedBooking.email"><span class="label">邮箱:</span><span>{{ selectedBooking.email }}</span></div>
+            <div class="detail-row"><span class="label">日期:</span><span>{{ formatDate(selectedBooking.date) }}</span></div>
+            <div class="detail-row"><span class="label">时间:</span><span>{{ selectedBooking.time }}</span></div>
+            <div class="detail-row"><span class="label">课程:</span><span>{{ selectedBooking.course }}</span></div>
+            <div class="detail-row"><span class="label">预约时间:</span><span>{{ new Date(selectedBooking.created_at).toLocaleString('zh-CN') }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <ImageEditor
+        :visible="editorVisible"
+        :image-file="editorFile"
+        :aspect-ratio="editorAspectRatio"
+        @confirm="handleEditorConfirm"
+        @cancel="handleEditorCancel"
+      />
+    </template>
+  </div>
+</template>
+
+<style scoped>
+/* Admin 页面样式保持不变，与原版一致 */
+.admin-page { min-height: 100vh; background: #f5f7fa; }
+
+.login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+.login-box { background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
+.login-box h2 { margin: 0 0 1rem; color: #333; }
+.login-hint { color: #666; margin-bottom: 1.5rem; }
+.login-box input { width: 100%; padding: 12px; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+.login-box button { width: 100%; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: background 0.3s; }
+.login-box button:hover { background: var(--primary-light); }
+.login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-box .error { color: #f56c6c; margin-top: 1rem; }
+
+.page-header { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.5rem 0; position: sticky; top: 0; z-index: 100; }
+.page-header .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+.header-flex { display: flex; justify-content: space-between; align-items: center; }
+.page-header h1 { margin: 0; color: #333; font-size: 1.8rem; }
+.page-header p { margin: 0.5rem 0 0; color: #666; }
+.logout-btn { padding: 0.5rem 1.5rem; background: #f56c6c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: background 0.3s; }
+.logout-btn:hover { background: #f78989; }
+
+.save-success { background: #67c23a; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; margin-top: 1rem; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+.admin-content { padding: 2rem 0; max-width: 1400px; margin: 0 auto; }
+.admin-content .container { padding: 0 2rem; }
+
+.tabs { display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid #eee; padding-bottom: 1rem; flex-wrap: wrap; }
+.tab { padding: 0.75rem 1.5rem; background: white; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: all 0.3s; }
+.tab:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.tab.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+.tab-content { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+.banners-list { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
+.banner-item { border: 1px solid #eee; border-radius: 10px; padding: 1.5rem; background: #fafafa; }
+.banner-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.field-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.field-group.lang-group { grid-column: span 1; }
+.field-group.full { grid-column: span 2; }
+.field-group label { font-weight: 600; color: #333; font-size: 0.9rem; }
+.field-group input, .field-group textarea { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+.field-group textarea { resize: vertical; min-height: 100px; font-family: inherit; }
+.checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.checkbox-label input[type="checkbox"] { width: auto; }
+.image-upload { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.image-upload input[type="file"] { flex: 1; }
+.preview-img { max-width: 150px; max-height: 100px; border-radius: 6px; border: 1px solid #eee; object-fit: cover; }
+.banner-actions { display: flex; gap: 1rem; justify-content: flex-end; }
+
+.btn-save { padding: 0.75rem 1.5rem; background: #67c23a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: background 0.3s; }
+.btn-save:hover { background: #85ce61; }
+.btn-delete { padding: 0.75rem 1.5rem; background: #f56c6c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: background 0.3s; }
+.btn-delete:hover { background: #f78989; }
+.btn-view { padding: 0.5rem 1rem; background: var(--info-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-right: 0.5rem; }
+.btn-view:hover { background: #66b1ff; }
+.btn-add { padding: 0.75rem 2rem; background: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
+.btn-add:hover:not(:disabled) { background: var(--primary-light); }
+.btn-add:disabled { background: #909399; cursor: not-allowed; }
+
+.simple-contents h3 { margin: 0 0 1.5rem; color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.75rem; }
+.content-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; }
+.content-item-simple { display: flex; flex-direction: column; gap: 0.5rem; }
+.content-item-simple.full { grid-column: span 2; }
+.content-item-simple label { font-weight: 600; color: #333; font-size: 0.9rem; }
+.content-item-simple input, .content-item-simple textarea { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+.content-item-simple textarea { resize: vertical; min-height: 100px; font-family: inherit; }
+.markdown-upload { display: flex; flex-direction: column; gap: 0.5rem; }
+.markdown-upload textarea { width: 100%; min-height: 150px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-family: 'Courier New', monospace; resize: vertical; box-sizing: border-box; }
+
+.bookings-filter { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+.bookings-filter input { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; flex: 1; max-width: 300px; }
+.bookings-list { overflow-x: auto; }
+.bookings-list table { width: 100%; border-collapse: collapse; }
+.bookings-list th, .bookings-list td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
+.bookings-list th { background: #fafafa; font-weight: 600; color: #333; }
+.empty-state { text-align: center; padding: 3rem; color: #909399; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-content { background: white; border-radius: 12px; padding: 2rem; width: 90%; max-width: 500px; animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
+.modal-header h3 { margin: 0; color: #333; }
+.modal-header button { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+.modal-header button:hover { color: #333; }
+.detail-row { display: flex; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #f5f5f5; }
+.detail-row .label { font-weight: 600; color: #333; width: 100px; }
+
+.teachers-settings { margin-bottom: 1.5rem; padding: 1rem; background: #f5f7fa; border-radius: 8px; }
+.setting-info { display: flex; gap: 2rem; align-items: center; }
+.teacher-count { color: var(--primary-color); font-weight: 500; }
+
+.teachers-list { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
+.teacher-item { border: 1px solid #eee; border-radius: 10px; padding: 1.5rem; background: #fafafa; }
+.teacher-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.avatar-group { grid-column: span 1; }
+.avatar-upload { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.avatar-upload input[type="file"] { flex: 1; }
+.avatar-preview { width: 120px; height: 120px; border-radius: 50%; border: 2px solid #e0e0e0; object-fit: cover; }
+.avatar-placeholder { width: 120px; height: 120px; border-radius: 50%; border: 2px dashed #e0e0e0; display: flex; align-items: center; justify-content: center; color: #909399; font-size: 0.9rem; text-align: center; }
+.teacher-actions { display: flex; gap: 1rem; justify-content: flex-end; }
+
+@media (max-width: 992px) {
+  .tabs { flex-wrap: wrap; gap: 0.5rem; }
+  .tab { padding: 0.5rem 1rem; font-size: 0.85rem; }
+}
+
+@media (max-width: 768px) {
+  .page-header { padding: 1rem 0; }
+  .page-header .container { padding: 0 1rem; }
+  .header-flex { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .page-header h1 { font-size: 1.4rem; }
+  .logout-btn { align-self: flex-start; min-height: 44px; padding: 0 1.25rem; }
+  .admin-content { padding: 1rem 0; }
+  .admin-content .container { padding: 0 0.75rem; }
+  .tab-content { padding: 1rem; border-radius: 10px; }
+  .content-row { grid-template-columns: 1fr; }
+  .content-item-simple.full { grid-column: span 1; }
+  .tabs { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .tab { padding: 0.6rem 1rem; font-size: 0.85rem; min-height: 44px; }
+  .banner-fields, .teacher-fields { grid-template-columns: 1fr; }
+  .banner-item, .teacher-item { padding: 1rem; }
+  .teacher-actions, .banner-actions { justify-content: stretch; }
+  .teacher-actions button, .banner-actions button { flex: 1; min-height: 44px; }
+  .setting-info { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .bookings-filter { flex-direction: column; gap: 0.75rem; }
+  .bookings-filter input { max-width: 100%; min-height: 44px; font-size: 15px; }
+  .bookings-list table { font-size: 13px; }
+  .bookings-list th, .bookings-list td { padding: 10px 6px; }
+  .btn-view, .btn-delete { min-height: 36px; font-size: 12px; padding: 0 10px; }
+  .btn-save, .btn-add { min-height: 44px; font-size: 14px; }
+  .modal-content { padding: 1.5rem; width: 95%; border-radius: 16px; }
+}
+
+@media (max-width: 480px) {
+  .login-box { padding: 2rem 1.5rem; border-radius: 16px; }
+  .login-box input { min-height: 48px; font-size: 16px; border-radius: 10px; }
+  .login-box button { min-height: 48px; font-size: 16px; border-radius: 10px; }
+  .preview-img { max-width: 100px; max-height: 80px; }
+  .avatar-preview, .avatar-placeholder { width: 80px; height: 80px; }
+  .bookings-list table { font-size: 12px; }
+  .bookings-list th, .bookings-list td { padding: 8px 4px; }
+  .field-group input, .field-group textarea, .content-item-simple input, .content-item-simple textarea { min-height: 44px; font-size: 15px; border-radius: 8px; }
+}
+</style>

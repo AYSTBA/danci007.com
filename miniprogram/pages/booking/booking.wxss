@@ -1,0 +1,322 @@
+/* ── 预约页：手机版布局 ── */
+
+.booking-page {
+  min-height: 100vh;
+  background: #fff;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ── 加载 ── */
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #43a047;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* ── Hero ── */
+.hero-section {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  padding: 48px 20px 36px;
+  text-align: center;
+}
+
+.hero-title {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.hero-subtitle {
+  display: block;
+  font-size: 14px;
+  color: rgba(255,255,255,0.85);
+}
+
+/* ── 通用 Section ── */
+.section {
+  padding: 24px 16px;
+}
+
+/* ── 联系方式 ── */
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.contact-card {
+  background: #f5f6fa;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.contact-icon {
+  font-size: 24px;
+}
+
+.contact-label {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.contact-val {
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 500;
+  text-align: center;
+}
+
+.contact-val.hint {
+  color: #43a047;
+}
+
+.contact-val.small {
+  font-size: 12px;
+}
+
+/* ── 表单 ── */
+.form-header {
+  margin-bottom: 16px;
+}
+
+.form-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.form-desc {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.form-card {
+  background: #f5f6fa;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.field.half {
+  flex: 1;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.req {
+  color: #ef4444;
+}
+
+.input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  background: #fff;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+}
+
+.input.textarea {
+  min-height: 80px;
+  padding-top: 12px;
+}
+
+.picker-val {
+  color: #1e293b;
+}
+
+.picker-val.disabled {
+  color: #94a3b8;
+}
+
+.submit-btn {
+  padding: 14px;
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  color: #fff;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+/* ── 成功 ── */
+.success-card {
+  background: #f5f6fa;
+  border-radius: 16px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.success-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.success-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.success-desc {
+  display: block;
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+.success-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.btn-outline {
+  padding: 12px 24px;
+  border: 1px solid #43a047;
+  color: #43a047;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ── 营业时间 ── */
+.hours-card {
+  background: #f5f6fa;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.hours-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.hours-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #475569;
+}
+
+.hours-val {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── 页脚 ── */
+.page-footer {
+  text-align: center;
+  padding: 20px;
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ── 弹窗 ── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  width: 280px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 24px;
+  color: #94a3b8;
+}
+
+.modal-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #1e293b;
+}
+
+.modal-qr {
+  width: 200px;
+  height: 200px;
+}

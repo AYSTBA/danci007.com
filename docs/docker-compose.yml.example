@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    image: danci007web:latest
+    container_name: danci007web
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-888888}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    volumes:
+      # 持久化数据库和上传文件（容器删了数据不会丢）
+      - ./data:/app/backend/data
+      - ./uploads:/app/backend/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/banners"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# 数据卷（本地目录挂载，宿主机可直接备份）
+volumes: {}

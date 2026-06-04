@@ -1,0 +1,194 @@
+<view class="course-page">
+  <!-- 加载 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:elif="{{course}}">
+    <!-- Banner -->
+    <view class="banner">
+      <image wx:if="{{course.imageUrl}}" class="banner-img" src="{{course.imageUrl}}" mode="aspectFill" />
+      <view wx:else class="banner-placeholder">
+        <view class="banner-inner">
+          <text class="banner-tag">中萱书店</text>
+          <text class="banner-main-title">{{course.name}}</text>
+          <view class="banner-teacher-info">
+            <text class="banner-teacher-name">{{course.teacher_name}}</text>
+            <text class="banner-teacher-title" wx:if="{{course.teacher_title}}">{{course.teacher_title}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 价格 + 标题 -->
+    <view class="price-section">
+      <view class="price-row">
+        <text wx:if="{{course.price === '0' || course.price === 0}}" class="price-free">免费</text>
+        <text wx:else class="price-val">¥{{course.price}}</text>
+        <text wx:if="{{course.original_price && course.original_price !== '0' && course.original_price !== course.price}}" class="price-orig">¥{{course.original_price}}</text>
+      </view>
+      <text class="course-title">{{course.name}}</text>
+    </view>
+
+    <!-- 讲师卡片 -->
+    <view class="teacher-card">
+      <view class="teacher-card-header">
+        <text class="teacher-tag">老师信息</text>
+        <text class="teacher-home" bindtap="goAbout">主页 ›</text>
+      </view>
+      <view class="teacher-body">
+        <view class="teacher-left">
+          <view class="teacher-name-row">
+            <text class="teacher-name">{{course.teacher_name || '—'}}</text>
+            <view class="verified-badge" wx:if="{{course.teacher_title}}">
+              <text class="verified-icon">✓</text>
+              <text>{{course.teacher_title}}</text>
+            </view>
+          </view>
+          <text class="teacher-lesson-count">本课程共{{course.lesson_count || '1'}}课时</text>
+        </view>
+        <view class="teacher-avatar-wrap">
+          <image wx:if="{{course.teacherAvatarUrl}}" class="teacher-avatar" src="{{course.teacherAvatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar-placeholder">
+            <text>{{course.teacherInitial}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="teacher-stats">
+        <view class="stat">
+          <text class="stat-val">{{course.validity || '长期有效'}}</text>
+          <text class="stat-label">有效期</text>
+        </view>
+        <view class="stat">
+          <text class="stat-val">{{course.status || '已完结'}}</text>
+          <text class="stat-label">状态</text>
+        </view>
+        <view class="stat">
+          <text class="stat-val">{{course.lesson_count || '1'}}课时</text>
+          <text class="stat-label">课时数</text>
+        </view>
+        <view class="stat">
+          <text class="stat-val">{{course.student_count || '11'}}人</text>
+          <text class="stat-label">学习人数</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- Tab 导航 -->
+    <view class="tab-nav">
+      <view class="tab-btn {{activeTab === 'detail' ? 'active' : ''}}" data-tab="detail" bindtap="switchTab">详情</view>
+      <view class="tab-btn {{activeTab === 'interact' ? 'active' : ''}}" data-tab="interact" bindtap="switchTab">互动</view>
+      <view class="tab-btn {{activeTab === 'review' ? 'active' : ''}}" data-tab="review" bindtap="switchTab">评价</view>
+    </view>
+
+    <!-- Tab 内容 -->
+    <view class="tab-content">
+      <!-- 详情 -->
+      <view class="detail-panel" wx:if="{{activeTab === 'detail'}}">
+        <view class="detail-text" wx:if="{{course.descParagraphs.length > 0}}">
+          <block wx:for="{{course.descParagraphs}}" wx:key="index">
+            <text class="detail-heading" wx:if="{{item.isTitle}}">{{item.text}}</text>
+            <text class="detail-para" wx:else>{{item.text}}</text>
+          </block>
+        </view>
+        <view class="detail-text" wx:elif="{{course.description}}">
+          <text class="detail-para">{{course.description}}</text>
+        </view>
+        <view class="detail-features" wx:if="{{course.features.length > 0}}">
+          <view class="feat-item" wx:for="{{course.features}}" wx:key="index">
+            <text class="feat-icon">{{item.icon}}</text>
+            <view class="feat-text">
+              <text class="feat-title">{{item.title}}</text>
+              <text class="feat-desc">{{item.desc}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 互动 -->
+      <view class="interact-panel" wx:if="{{activeTab === 'interact'}}">
+        <view class="comment-input-area">
+          <input class="comment-name-input" placeholder="您的昵称" value="{{commentName}}" bindinput="onCommentNameInput" />
+          <view class="comment-row">
+            <input class="comment-input" placeholder="说点什么..." value="{{newComment}}" bindinput="onCommentInput" bindconfirm="submitComment" />
+            <view class="comment-send" bindtap="submitComment">发送</view>
+          </view>
+        </view>
+        <view class="comment-tip" wx:if="{{commentSubmitted}}">✓ 发布成功</view>
+        <view class="comment-list">
+          <view class="empty-tip" wx:if="{{interactions.length === 0}}">暂无互动，快来抢沙发~</view>
+          <view class="comment-item" wx:for="{{interactions}}" wx:key="id">
+            <view class="comment-avatar">{{item.nameInitial}}</view>
+            <view class="comment-body">
+              <view class="comment-meta">
+                <text class="comment-name">{{item.name}}</text>
+                <text class="comment-time">{{item.created_at}}</text>
+              </view>
+              <text class="comment-text">{{item.content}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 评价 -->
+      <view class="review-panel" wx:if="{{activeTab === 'review'}}">
+        <view class="review-summary">
+          <view class="summary-left">
+            <text class="summary-score">{{avgRating}}</text>
+            <text class="summary-stars">{{avgRating >= 1 ? '★' : '☆'}}{{avgRating >= 2 ? '★' : '☆'}}{{avgRating >= 3 ? '★' : '☆'}}{{avgRating >= 4 ? '★' : '☆'}}{{avgRating >= 5 ? '★' : '☆'}}</text>
+            <text class="summary-count">{{reviews.length}}条评价</text>
+          </view>
+          <view class="write-review-btn" bindtap="toggleReviewForm">写评价</view>
+        </view>
+
+        <view class="review-form" wx:if="{{showReviewForm}}">
+          <input class="review-name-input" placeholder="您的昵称" value="{{myName}}" bindinput="onReviewNameInput" />
+          <view class="rating-select">
+            <text class="rating-label">评分</text>
+            <view class="star-select">
+              <text class="star-btn {{1 <= myRating ? 'active' : ''}}" data-star="1" bindtap="setRating">★</text>
+              <text class="star-btn {{2 <= myRating ? 'active' : ''}}" data-star="2" bindtap="setRating">★</text>
+              <text class="star-btn {{3 <= myRating ? 'active' : ''}}" data-star="3" bindtap="setRating">★</text>
+              <text class="star-btn {{4 <= myRating ? 'active' : ''}}" data-star="4" bindtap="setRating">★</text>
+              <text class="star-btn {{5 <= myRating ? 'active' : ''}}" data-star="5" bindtap="setRating">★</text>
+            </view>
+            <text class="rating-text">{{myRating}}.0</text>
+          </view>
+          <textarea class="review-textarea" placeholder="分享您的学习体验..." value="{{myReview}}" bindinput="onReviewInput" />
+          <view class="review-submit" bindtap="submitReview">提交评价</view>
+        </view>
+        <view class="review-tip" wx:if="{{reviewSubmitted}}">✓ 评价发布成功</view>
+
+        <view class="review-list">
+          <view class="empty-tip" wx:if="{{reviews.length === 0}}">暂无评价</view>
+          <view class="review-item" wx:for="{{reviews}}" wx:key="id">
+            <view class="review-header">
+              <text class="review-avatar">{{item.nameInitial}}</text>
+              <view class="review-meta">
+                <text class="review-name">{{item.name}}</text>
+                <text class="review-stars">{{item.rating >= 1 ? '★' : '☆'}}{{item.rating >= 2 ? '★' : '☆'}}{{item.rating >= 3 ? '★' : '☆'}}{{item.rating >= 4 ? '★' : '☆'}}{{item.rating >= 5 ? '★' : '☆'}}</text>
+              </view>
+              <text class="review-time">{{item.created_at}}</text>
+            </view>
+            <text class="review-content">{{item.content}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部安全区 -->
+    <view class="safe-bottom"></view>
+
+    <!-- 底部操作栏 -->
+    <view class="bottom-bar">
+      <view class="bottom-actions">
+        <button class="action-item" open-type="share">
+          <text class="action-icon">↗</text>
+          <text>分享</text>
+        </button>
+      </view>
+      <view class="enter-btn" bindtap="doEnroll">立即报名</view>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,103 @@
+<view class="page-container">
+  <!-- 加载中 -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:else>
+    <!-- Banner 轮播 -->
+    <swiper
+      class="banner-swiper"
+      current="{{currentBanner}}"
+      bindchange="onBannerChange"
+      autoplay="{{false}}"
+      circular
+      indicator-dots
+      indicator-color="rgba(255,255,255,0.4)"
+      indicator-active-color="#ffffff"
+    >
+      <swiper-item wx:for="{{banners}}" wx:key="id">
+        <image class="banner-img" src="{{item.imageUrl}}" mode="aspectFill" />
+      </swiper-item>
+    </swiper>
+
+    <!-- 空Banner占位 -->
+    <view class="banner-placeholder" wx:if="{{banners.length === 0}}">
+      <text class="placeholder-text">{{siteTitle}}</text>
+    </view>
+
+    <!-- 为什么选择我们 -->
+    <view class="section why-section" wx:if="{{whyParagraphs.length > 0}}">
+      <view class="section-inner">
+        <text class="section-title">{{pageContents.why_title || '为什么选择我们'}}</text>
+        <view class="why-content">
+          <block wx:for="{{whyParagraphs}}" wx:key="index">
+            <text class="why-heading" wx:if="{{item.isTitle}}">{{item.text}}</text>
+            <text class="why-para" wx:else>{{item.text}}</text>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <!-- 师资力量 -->
+    <view class="section teachers-section" wx:if="{{teachers.length > 0}}">
+      <view class="section-inner">
+        <text class="section-title">我们的师资力量</text>
+        <scroll-view class="teacher-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="teacher-list">
+            <view class="teacher-card" wx:for="{{teachers}}" wx:key="id">
+              <view class="teacher-avatar-wrap">
+                <image
+                  class="teacher-avatar"
+                  src="{{item.avatarUrl}}"
+                  mode="aspectFill"
+                  data-index="{{index}}"
+                  binderror="onTeacherImgError"
+                  wx:if="{{item.avatarUrl}}"
+                />
+                <view class="teacher-avatar-fallback" wx:else>
+                  <text>{{item.nameInitial}}</text>
+                </view>
+              </view>
+              <text class="teacher-name">{{item.name}}</text>
+              <text class="teacher-title" wx:if="{{item.title}}">{{item.title}}</text>
+              <text class="teacher-desc" wx:if="{{item.description}}">{{item.description}}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
+    <!-- 学员照片墙 -->
+    <view class="section gallery-section">
+      <view class="section-inner">
+        <text class="section-title">学员风采</text>
+        <text class="section-subtitle">记录每一位学员的成长瞬间</text>
+        <view class="gallery-grid">
+          <view class="gallery-item" wx:for="{{galleryPhotos}}" wx:key="id">
+            <image
+              class="gallery-img"
+              src="{{item.url}}"
+              mode="aspectFill"
+              data-index="{{index}}"
+              binderror="onGalleryError"
+              lazy-load
+            />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 页脚 -->
+    <view class="page-footer">
+      <view class="footer-top">
+        <text class="footer-brand">{{siteTitle}}</text>
+      </view>
+      <view class="footer-bottom">
+        <text class="footer-note">{{siteNote}}</text>
+        <text class="footer-copy">© {{siteTitle}}. All rights reserved.</text>
+      </view>
+    </view>
+  </block>
+</view>

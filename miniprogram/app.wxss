@@ -1,0 +1,132 @@
+/* app.wxss — 全局样式 */
+
+/* ── 主题色变量 ── */
+page {
+  --primary: #4CAF50;
+  --primary-dark: #388E3C;
+  --primary-light: #C8E6C9;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-light: #999999;
+  --bg-page: #f7f8fa;
+  --bg-card: #ffffff;
+  --radius-card: 16rpx;
+  --radius-btn: 48rpx;
+  --shadow-card: 0 4rpx 24rpx rgba(0, 0, 0, 0.07);
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-size: 28rpx;
+}
+
+/* ── 全局 Reset ── */
+view, text, image, input, textarea, button {
+  box-sizing: border-box;
+}
+
+/* ── 通用卡片 ── */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* ── 区块标题 ── */
+.section-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  letter-spacing: 2rpx;
+}
+
+.section-subtitle {
+  font-size: 24rpx;
+  color: var(--text-light);
+  text-align: center;
+  margin-top: 8rpx;
+}
+
+/* ── 主按钮 ── */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  padding: 24rpx 0;
+  border: none;
+  letter-spacing: 2rpx;
+}
+
+.btn-primary::after { border: none; }
+
+/* ── 幽灵按钮 ── */
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--primary);
+  font-size: 28rpx;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  padding: 20rpx 0;
+  border: 2rpx solid var(--primary);
+}
+
+.btn-ghost::after { border: none; }
+
+/* ── 分割线 ── */
+.divider {
+  height: 1rpx;
+  background: #f0f0f0;
+  margin: 0 32rpx;
+}
+
+/* ── Loading 骨架屏占位 ── */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8rpx;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── 全屏 Loading ── */
+.page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 24rpx;
+}
+
+.page-loading text {
+  font-size: 26rpx;
+  color: var(--text-light);
+}
+
+/* ── 空状态 ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 40rpx;
+  gap: 20rpx;
+}
+
+.empty-state text {
+  font-size: 26rpx;
+  color: var(--text-light);
+}
