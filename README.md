@@ -11,7 +11,7 @@
 [![Express](https://img.shields.io/badge/Express-4.18-000000?style=flat&logo=express)](https://expressjs.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3.45-003B57?style=flat&logo=sqlite)](https://www.sqlite.org/)
 
-[🚀 在线演示](http://165.99.43.241:3001) | [📚 API 文档](./docs/API.md) | [📝 更新日志](./docs/CHANGELOG.md)
+[🚀 在线演示](#) | [📚 API 文档](./docs/API.md) | [📝 更新日志](./docs/CHANGELOG.md)
 
 </div>
 
@@ -166,12 +166,14 @@ cp .env.example .env
 
 编辑 `.env`，修改以下配置：
 ```env
-# 管理员密码（⚠️ 务必修改！）
-ADMIN_<SECRET_REMOVED>
+# 管理员密码（⚠️ 生产环境务必修改！）
+ADMIN_PASSWORD=your_strong_password_here
 
-# Token 密钥（⚠️ 务必修改！）
-ADMIN_TOKEN_<SECRET_REMOVED>
+# Token 密钥（⚠️ 生产环境务必修改！）
+ADMIN_TOKEN_SECRET=your_random_secret_key_here
 ```
+
+> ⚠️ **安全警告：** 默认密码仅用于开发测试，生产环境必须修改为强密码！
 
 ### 4️⃣ 初始化数据库
 
@@ -290,19 +292,19 @@ git push origin main
 
 **登录获取 Token：**
 ```bash
-curl -X POST http://165.99.43.241:3001/api/admin/login \
+curl -X POST http://localhost:3001/api/admin/login \
   -H "Content-Type: application/json" \
-  -d '{"password": "888888"}'
+  -d '{"password": "your_password"}'
 ```
 
 **获取首页内容：**
 ```bash
-curl http://165.99.43.241:3001/api/pages/home/contents
+curl http://localhost:3001/api/pages/home/contents
 ```
 
 **提交预约：**
 ```bash
-curl -X POST http://165.99.43.241:3001/api/bookings \
+curl -X POST http://localhost:3001/api/bookings \
   -H "Content-Type: application/json" \
   -d '{"name":"张三","phone":"13800138000","date":"2026-06-10","time":"14:00","course":"单词突击007基础班"}'
 ```
@@ -369,7 +371,7 @@ Copyright © 2026 中萱文化 - 深圳市龙岗区教学点
 
 ## 📞 联系方式
 
-- 🌐 **官方网站：** [http://165.99.43.241:3001](http://165.99.43.241:3001)
+- 🌐 **官方网站：** [http://localhost:3001](http://localhost:3001)
 - 📧 **联系邮箱：** （待添加）
 - 📱 **微信公众号：** （待添加）
 - 📍 **地址：** 深圳市龙岗区悦龙华府·二期8栋20号(中萱英语)

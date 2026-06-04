@@ -1,6 +1,6 @@
 # 单词突击007 - API 文档
 
-**Base URL:** `http://165.99.43.241:3001`  
+**Base URL:** `http://localhost:3001`  
 **Content-Type:** `application/json` (除了文件上传)
 
 ---
@@ -16,7 +16,7 @@
 **请求体：**
 ```json
 {
-  "password": "888888"
+  "password": "your_password"
 }
 ```
 
@@ -30,9 +30,9 @@
 
 **使用示例：**
 ```bash
-curl -X POST http://165.99.43.241:3001/api/admin/login \
+curl -X POST http://localhost:3001/api/admin/login \
   -H "Content-Type: application/json" \
-  -d '{"password": "888888"}'
+  -d '{"password": "your_password"}'
 ```
 
 ---
@@ -433,7 +433,7 @@ file: <binary-image-data>
 
 **使用示例：**
 ```bash
-curl -X POST http://165.99.43.241:3001/api/upload \
+curl -X POST http://localhost:3001/api/upload \
   -H "x-admin-token: <your-token>" \
   -F "file=@/path/to/image.jpg"
 ```
@@ -781,10 +781,10 @@ x-admin-token: <your-token>
 ```python
 import requests
 
-BASE_URL = "http://165.99.43.241:3001"
+BASE_URL = "http://localhost:3001"
 
 # 1. 登录获取 token
-def login(password="888888"):
+def login(password="your_password"):
     response = requests.post(f"{BASE_URL}/api/admin/login", json={"password": password})
     data = response.json()
     if data.get("success"):
@@ -823,7 +823,7 @@ def submit_booking(name, phone, date, time, course):
 # 使用示例
 if __name__ == "__main__":
     # 登录
-    token = login("888888")
+    token = login("your_password")
     print(f"Token: {token}")
     
     # 获取首页内容
@@ -842,10 +842,10 @@ if __name__ == "__main__":
 ```javascript
 const axios = require('axios');
 
-const BASE_URL = 'http://165.99.43.241:3001';
+const BASE_URL = 'http://localhost:3001';
 
 // 1. 登录获取 token
-async function login(password = '888888') {
+async function login(password = 'your_password') {
   const response = await axios.post(`${BASE_URL}/api/admin/login`, { password });
   if (response.data.success) {
     return response.data.token;
@@ -880,7 +880,7 @@ async function submitBooking(name, phone, date, time, course) {
 // 使用示例
 (async () => {
   // 登录
-  const token = await login('888888');
+  const token = await login('your_password');
   console.log('Token:', token);
   
   // 获取首页内容
