@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import Database from 'better-sqlite3';
 import sharp from 'sharp';
 import 'dotenv/config';
@@ -456,6 +456,70 @@ app.post('/api/upload', requireAdminAuth, upload.single('file'), async (req, res
   }
 });
 
+// ── 孤儿文件清理 (上传后未保存到数据库的图片) ──
+// GET  /api/admin/orphan-uploads  → 列出未引用的文件
+// POST /api/admin/orphan-uploads  → 删除未引用的文件
+//                                     body: { olderThanHours?: number, paths?: string[] }
+function collectReferencedUploadPaths() {
+  const refSet = new Set();
+  const tryAdd = (val) => {
+    if (typeof val !== 'string') return;
+    const m = val.match(/\/uploads\/([^\s"'<>)]+)/g);
+    if (m) m.forEach(p => refSet.add(p.replace('/uploads/', '')));
+  };
+  for (const table of ['banners', 'teachers', 'page_contents']) {
+    try {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+      for (const col of cols) {
+        const rows = db.prepare(`SELECT "${col.name}" FROM ${table}`).all();
+        for (const row of rows) tryAdd(row[col.name]);
+      }
+    } catch { /* 表可能不存在 */ }
+  }
+  return refSet;
+}
+
+app.get('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
+  try {
+    const files = readdirSync(uploadDir).filter(f => !f.startsWith('.'));
+    const referenced = collectReferencedUploadPaths();
+    const orphans = files.filter(f => !referenced.has(f));
+    const totalSize = orphans.reduce((sum, f) => {
+      try { return sum + require('fs').statSync(path.join(uploadDir, f)).size; } catch { return sum; }
+    }, 0);
+    res.json({ orphans, count: orphans.length, totalSize });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
+  try {
+    const { olderThanHours = 0, paths } = req.body || {};
+    let toDelete;
+    if (Array.isArray(paths) && paths.length > 0) {
+      toDelete = paths.filter(p => typeof p === 'string' && !p.includes('/') && !p.includes('\\'));
+    } else {
+      const files = readdirSync(uploadDir).filter(f => !f.startsWith('.'));
+      const referenced = collectReferencedUploadPaths();
+      toDelete = files.filter(f => !referenced.has(f));
+    }
+    if (olderThanHours > 0) {
+      const cutoff = Date.now() - olderThanHours * 3600 * 1000;
+      toDelete = toDelete.filter(f => {
+        try { return require('fs').statSync(path.join(uploadDir, f)).mtimeMs < cutoff; } catch { return false; }
+      });
+    }
+    let deleted = 0;
+    for (const f of toDelete) {
+      try { unlinkSync(path.join(uploadDir, f)); deleted++; } catch {}
+    }
+    res.json({ success: true, deleted, total: toDelete.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── 课程招生页 API ──
 
 // 课程列表（公开接口）
@@ -610,3 +674,31 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  🔧 后台管理: http://localhost:${PORT}/admin`);
   console.log(`  📦 数据路径: ${dbPath}\n`);
 });
+
+// ── CLI 入口：node server.js --cleanup [hours] ──
+if (process.argv.includes('--cleanup')) {
+  const idx = process.argv.indexOf('--cleanup');
+  const hours = Number(process.argv[idx + 1]) || 24;
+  try {
+    const files = readdirSync(uploadDir).filter(f => !f.startsWith('.'));
+    const referenced = collectReferencedUploadPaths();
+    const cutoff = Date.now() - hours * 3600 * 1000;
+    let deleted = 0;
+    let totalBytes = 0;
+    for (const f of files) {
+      if (referenced.has(f)) continue;
+      const full = path.join(uploadDir, f);
+      try {
+        const st = require('fs').statSync(full);
+        if (st.mtimeMs >= cutoff) continue;
+        unlinkSync(full);
+        deleted++;
+        totalBytes += st.size;
+      } catch {}
+    }
+    console.log(`[cleanup] 删除 ${deleted} 个 ${hours}h 前的孤儿文件 (${(totalBytes / 1024 / 1024).toFixed(2)} MB)`);
+  } catch (e) {
+    console.error('[cleanup] 错误:', e.message);
+  }
+  process.exit(0);
+}

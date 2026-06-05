@@ -21,6 +21,7 @@ const cropX = ref(0);
 const cropY = ref(0);
 const cropWidth = ref(0);
 const cropHeight = ref(0);
+const isProcessing = ref(false);
 const isDraggingCrop = ref(false);
 const isDraggingImage = ref(false);
 const dragStartX = ref(0);
@@ -251,9 +252,12 @@ const zoomOut = () => {
 };
 
 const confirmCrop = () => {
+  if (isProcessing.value) return;
   const canvas = canvasRef.value;
   if (!canvas || !image.value) return;
-  
+
+  isProcessing.value = true;
+
   const tempCanvas = document.createElement('canvas');
   const tempCtx = tempCanvas.getContext('2d');
   if (!tempCtx) return;
@@ -335,12 +339,16 @@ const confirmCrop = () => {
 };
 
 const cancel = () => {
+  if (isProcessing.value) return;
   emit('cancel');
 };
 
 watch(() => props.visible, (newVal) => {
-  if (newVal && props.imageFile) {
-    initImage(props.imageFile as File);
+  if (newVal) {
+    isProcessing.value = false;
+    if (props.imageFile) {
+      initImage(props.imageFile as File);
+    }
   }
 });
 
@@ -351,11 +359,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="visible" class="image-editor-overlay" @click.self="cancel">
+  <div v-if="visible" class="image-editor-overlay" :class="{ 'no-close': isProcessing }" @click.self="cancel">
     <div class="image-editor">
       <div class="editor-header">
         <h3>编辑图片</h3>
-        <button class="close-btn" @click="cancel">×</button>
+        <button class="close-btn" :disabled="isProcessing" @click="cancel">×</button>
       </div>
       
       <div class="editor-body">
@@ -420,8 +428,10 @@ onMounted(() => {
       </div>
       
       <div class="editor-footer">
-        <button class="btn btn-cancel" @click="cancel">取消</button>
-        <button class="btn btn-confirm" @click="confirmCrop">确认</button>
+        <button class="btn btn-cancel" :disabled="isProcessing" @click="cancel">取消</button>
+        <button class="btn btn-confirm" :disabled="isProcessing" @click="confirmCrop">
+          {{ isProcessing ? '处理中…' : '确认' }}
+        </button>
       </div>
     </div>
   </div>
@@ -622,6 +632,16 @@ onMounted(() => {
 
 .btn-confirm:hover {
   background: #43a047;
+}
+
+.btn:disabled,
+.close-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-confirm:disabled {
+  background: #9ccc65;
 }
 
 @media (max-width: 768px) {
