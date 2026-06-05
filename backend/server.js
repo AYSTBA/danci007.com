@@ -17,13 +17,13 @@ const PORT = process.env.PORT || 80;
 const isDev = process.env.NODE_ENV !== 'production';
 
 // ── 管理员密码 ──
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isDev ? 'admin' : null);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isDev ? '888888' : null);
 if (!ADMIN_PASSWORD) {
   console.error('FATAL: 生产环境必须设置 ADMIN_PASSWORD 环境变量');
   process.exit(1);
 }
 if (!process.env.ADMIN_PASSWORD) {
-  console.warn('⚠ 使用默认密码 admin（仅限本地开发，生产环境请设置 ADMIN_PASSWORD）');
+  console.warn('⚠ 使用默认密码 888888（仅限本地开发，生产环境请设置 ADMIN_PASSWORD）');
 }
 
 const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
