@@ -205,11 +205,6 @@ const initDb = () => {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    // ── 兼容旧表：补齐缺失列 ──
-    for (const col of ['lesson_count', 'student_count', 'status', 'validity', 'sort_order']) {
-      try { db.exec(`ALTER TABLE courses ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
-    }
-
     CREATE TABLE IF NOT EXISTS course_enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       course_id TEXT NOT NULL,
@@ -236,6 +231,11 @@ const initDb = () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // 兼容旧表：补齐缺失列
+  for (const col of ['lesson_count', 'student_count', 'status', 'validity', 'sort_order']) {
+    try { db.exec(`ALTER TABLE courses ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
+  }
 
   const defaultContents = db.prepare('SELECT COUNT(*) as count FROM page_contents').get().count;
   if (defaultContents === 0) {
