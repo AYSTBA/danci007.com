@@ -195,10 +195,20 @@ const initDb = () => {
       teacher_avatar TEXT DEFAULT '',
       banner_image TEXT DEFAULT '',
       features TEXT DEFAULT '[]',
+      lesson_count TEXT DEFAULT '1',
+      student_count TEXT DEFAULT '0',
+      status TEXT DEFAULT '已完结',
+      validity TEXT DEFAULT '长期有效',
+      sort_order INTEGER DEFAULT 0,
       active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    // ── 兼容旧表：补齐缺失列 ──
+    for (const col of ['lesson_count', 'student_count', 'status', 'validity', 'sort_order']) {
+      try { db.exec(`ALTER TABLE courses ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
+    }
 
     CREATE TABLE IF NOT EXISTS course_enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -525,7 +535,7 @@ app.post('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
 // 课程列表（公开接口）
 app.get('/api/courses', (req, res) => {
   try {
-    const courses = db.prepare('SELECT * FROM courses WHERE active = 1 ORDER BY created_at DESC').all();
+    const courses = db.prepare('SELECT * FROM courses WHERE active = 1 ORDER BY sort_order ASC, created_at DESC').all();
     res.json(courses);
   } catch (err) {
     res.status(500).json({ error: '获取课程列表失败' });
@@ -552,11 +562,26 @@ app.get('/api/admin/courses', requireAdminAuth, (req, res) => {
 
 app.post('/api/courses', requireAdminAuth, (req, res) => {
   try {
-    const { course_id, name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features, active } = req.body;
+    const {
+      course_id, name, name_en, subtitle, subtitle_en, description, description_en,
+      price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en,
+      teacher_avatar, banner_image, features, lesson_count, student_count, status, validity,
+      sort_order, active
+    } = req.body;
+    if (!course_id || !/^[a-zA-Z0-9_-]{2,40}$/.test(course_id)) {
+      return res.status(400).json({ error: 'course_id 必须是 2-40 位的字母数字下划线连字符' });
+    }
     const result = db.prepare(`
-      INSERT INTO courses (course_id, name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(course_id, name || '', name_en || '', subtitle || '', subtitle_en || '', description || '', description_en || '', price || '0', original_price || '0', teacher_name || '', teacher_name_en || '', teacher_title || '', teacher_title_en || '', teacher_avatar || '', banner_image || '', JSON.stringify(features || []), active !== undefined ? active : 1);
+      INSERT INTO courses (course_id, name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features, lesson_count, student_count, status, validity, sort_order, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      course_id, name || '', name_en || '', subtitle || '', subtitle_en || '',
+      description || '', description_en || '', price || '0', original_price || '0',
+      teacher_name || '', teacher_name_en || '', teacher_title || '', teacher_title_en || '',
+      teacher_avatar || '', banner_image || '', JSON.stringify(features || []),
+      lesson_count || '1', student_count || '0', status || '已完结', validity || '长期有效',
+      Number(sort_order) || 0, active !== undefined ? active : 1
+    );
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -566,10 +591,35 @@ app.post('/api/courses', requireAdminAuth, (req, res) => {
 app.put('/api/courses/:id', requireAdminAuth, (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features, active } = req.body;
+    const {
+      name, name_en, subtitle, subtitle_en, description, description_en,
+      price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en,
+      teacher_avatar, banner_image, features, lesson_count, student_count, status, validity,
+      sort_order, active
+    } = req.body;
     db.prepare(`
-      UPDATE courses SET name=COALESCE(?,name), name_en=COALESCE(?,name_en), subtitle=COALESCE(?,subtitle), subtitle_en=COALESCE(?,subtitle_en), description=COALESCE(?,description), description_en=COALESCE(?,description_en), price=COALESCE(?,price), original_price=COALESCE(?,original_price), teacher_name=COALESCE(?,teacher_name), teacher_name_en=COALESCE(?,teacher_name_en), teacher_title=COALESCE(?,teacher_title), teacher_title_en=COALESCE(?,teacher_title_en), teacher_avatar=COALESCE(?,teacher_avatar), banner_image=COALESCE(?,banner_image), features=COALESCE(?,features), active=COALESCE(?,active), updated_at=CURRENT_TIMESTAMP WHERE id=?
-    `).run(name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features ? JSON.stringify(features) : null, active, id);
+      UPDATE courses SET
+        name=COALESCE(?,name), name_en=COALESCE(?,name_en),
+        subtitle=COALESCE(?,subtitle), subtitle_en=COALESCE(?,subtitle_en),
+        description=COALESCE(?,description), description_en=COALESCE(?,description_en),
+        price=COALESCE(?,price), original_price=COALESCE(?,original_price),
+        teacher_name=COALESCE(?,teacher_name), teacher_name_en=COALESCE(?,teacher_name_en),
+        teacher_title=COALESCE(?,teacher_title), teacher_title_en=COALESCE(?,teacher_title_en),
+        teacher_avatar=COALESCE(?,teacher_avatar), banner_image=COALESCE(?,banner_image),
+        features=COALESCE(?,features),
+        lesson_count=COALESCE(?,lesson_count), student_count=COALESCE(?,student_count),
+        status=COALESCE(?,status), validity=COALESCE(?,validity),
+        sort_order=COALESCE(?,sort_order),
+        active=COALESCE(?,active),
+        updated_at=CURRENT_TIMESTAMP
+      WHERE id=?
+    `).run(
+      name, name_en, subtitle, subtitle_en, description, description_en,
+      price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en,
+      teacher_avatar, banner_image, features ? JSON.stringify(features) : null,
+      lesson_count, student_count, status, validity, sort_order,
+      active, id
+    );
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

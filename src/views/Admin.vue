@@ -32,6 +32,10 @@ const editorCallback = ref<((file: File) => void) | null>(null);
 const courseReviews = ref<any[]>([]);
 const courseInteractions = ref<any[]>([]);
 
+// 课程管理
+const courses = ref<any[]>([]);
+const editingCourse = ref<any | null>(null);
+
 const dataLoading = ref(false);
 const dataError = ref<string | null>(null);
 
@@ -154,13 +158,14 @@ const loadData = async () => {
   dataError.value = null;
   try {
     const headers = getAuthHeaders();
-    const [bookingsData, bannerData, contents, teacherData, reviewsData, interactionsData] = await Promise.all([
+    const [bookingsData, bannerData, contents, teacherData, reviewsData, interactionsData, coursesData] = await Promise.all([
       fetchJson<BookingData[]>('/api/bookings', { headers }),
       fetchJson<Banner[]>('/api/admin/banners', { headers }),
       fetchJson<PageContents>('/api/pages/home/contents', { headers }),
       fetchJson<Teacher[]>('/api/teachers', { headers }),
       fetchJson<any[]>('/api/admin/course-reviews', { headers }),
-      fetchJson<any[]>('/api/admin/course-interactions', { headers })
+      fetchJson<any[]>('/api/admin/course-interactions', { headers }),
+      fetchJson<any[]>('/api/admin/courses', { headers })
     ]);
 
     bookings.value = bookingsData;
@@ -169,6 +174,7 @@ const loadData = async () => {
     teachers.value = teacherData.map((t: any) => ({ ...t, active: normalizeActive(t.active) }));
     courseReviews.value = reviewsData;
     courseInteractions.value = interactionsData;
+    courses.value = coursesData.map((c: any) => ({ ...c, active: normalizeActive(c.active) }));
   } catch (e: any) {
     // 如果鉴权失败，自动登出
     if (e.message?.includes('401') || e.message?.includes('403')) {
@@ -204,6 +210,130 @@ const addTeacher = () => {
     active: true,
     sort_order: teachers.value.length
   });
+};
+
+// ── 课程管理 ──
+const newCourseTemplate = () => ({
+  id: Date.now(),
+  course_id: '',
+  name: '',
+  name_en: '',
+  subtitle: '',
+  subtitle_en: '',
+  description: '',
+  description_en: '',
+  price: '0',
+  original_price: '0',
+  teacher_name: '',
+  teacher_name_en: '',
+  teacher_title: '',
+  teacher_title_en: '',
+  teacher_avatar: '',
+  banner_image: '',
+  features: [] as any[],
+  lesson_count: '1',
+  student_count: '0',
+  status: '已完结',
+  validity: '长期有效',
+  sort_order: 0,
+  active: true
+});
+
+const addCourse = () => {
+  editingCourse.value = newCourseTemplate();
+};
+
+const editCourse = (c: any) => {
+  editingCourse.value = JSON.parse(JSON.stringify(c));
+  // 把 features 字符串/数组统一
+  if (typeof editingCourse.value.features === 'string') {
+    try { editingCourse.value.features = JSON.parse(editingCourse.value.features); } catch { editingCourse.value.features = []; }
+  }
+  if (!Array.isArray(editingCourse.value.features)) editingCourse.value.features = [];
+};
+
+const cancelEditCourse = () => {
+  editingCourse.value = null;
+};
+
+const saveCourse = async () => {
+  if (!editingCourse.value) return;
+  const c = editingCourse.value;
+  if (!c.course_id || !c.name) {
+    alert('请填写课程ID和课程名称');
+    return;
+  }
+  try {
+    const data = { ...c, active: c.active ? 1 : 0 };
+    let response;
+    if (c.id > 1000000000000 || !courses.value.find(x => x.id === c.id)) {
+      // 新建
+      response = await authFetch('/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } else {
+      response = await authFetch(`/api/courses/${c.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    }
+    if (response.ok) {
+      showSaveSuccess('课程已保存');
+      await loadData();
+      editingCourse.value = null;
+    } else {
+      const err = await response.json().catch(() => ({}));
+      alert('保存失败：' + (err.error || response.statusText));
+    }
+  } catch (e: any) {
+    alert('保存出错：' + e.message);
+  }
+};
+
+const removeCourse = async (c: any) => {
+  if (!confirm(`确定删除课程「${c.name}」吗？`)) return;
+  try {
+    const r = await authFetch(`/api/courses/${c.id}`, { method: 'DELETE' });
+    if (r.ok) {
+      courses.value = courses.value.filter(x => x.id !== c.id);
+      showSaveSuccess('课程已删除');
+    } else {
+      alert('删除失败');
+    }
+  } catch (e: any) {
+    alert('删除出错：' + e.message);
+  }
+};
+
+const addCourseFeature = () => {
+  if (!editingCourse.value) return;
+  editingCourse.value.features.push({ icon: '⭐', title: '', desc: '' });
+};
+
+const removeCourseFeature = (i: number) => {
+  if (!editingCourse.value) return;
+  editingCourse.value.features.splice(i, 1);
+};
+
+const handleCourseBannerUpload = async (event: Event, course: any) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = '';
+  if (!file) return;
+  const url = await uploadImage(file);
+  if (url) course.banner_image = url;
+};
+
+const handleCourseAvatarUpload = async (event: Event, course: any) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = '';
+  if (!file) return;
+  const url = await uploadImage(file);
+  if (url) course.teacher_avatar = url;
 };
 
 const saveTeacher = async (teacher: Teacher) => {
@@ -605,6 +735,7 @@ onMounted(() => {
         <div class="container">
           <div class="tabs">
             <button :class="['tab', { active: activeTab === 'banners' }]" @click="activeTab = 'banners'">活动Banner管理</button>
+            <button :class="['tab', { active: activeTab === 'courses' }]" @click="activeTab = 'courses'">课程管理</button>
             <button :class="['tab', { active: activeTab === 'contents' }]" @click="activeTab = 'contents'">页面内容编辑</button>
             <button :class="['tab', { active: activeTab === 'bookings' }]" @click="activeTab = 'bookings'">预约记录</button>
             <button :class="['tab', { active: activeTab === 'teachers' }]" @click="activeTab = 'teachers'">师资力量管理</button>
@@ -689,6 +820,152 @@ onMounted(() => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 课程管理 Tab -->
+          <div v-show="activeTab === 'courses'" class="tab-content">
+            <!-- 编辑器 -->
+            <div v-if="editingCourse" class="course-editor">
+              <h3>{{ courses.find(c => c.id === editingCourse.id) ? '编辑课程' : '新增课程' }}</h3>
+              <div class="banner-fields">
+                <div class="field-group">
+                  <label>课程 ID (URL 用,如: my-course)</label>
+                  <input v-model="editingCourse.course_id" :disabled="courses.find(c => c.id === editingCourse.id)" placeholder="my-course" />
+                </div>
+                <div class="field-group">
+                  <label>课程名称 (中文) *</label>
+                  <input v-model="editingCourse.name" placeholder="单词突击" />
+                </div>
+                <div class="field-group">
+                  <label>课程名称 (English)</label>
+                  <input v-model="editingCourse.name_en" placeholder="Word Assault" />
+                </div>
+                <div class="field-group">
+                  <label>副标题 (中文)</label>
+                  <input v-model="editingCourse.subtitle" placeholder="高效记忆,科学复习" />
+                </div>
+                <div class="field-group">
+                  <label>副标题 (English)</label>
+                  <input v-model="editingCourse.subtitle_en" placeholder="Effective, Scientific" />
+                </div>
+                <div class="field-group full">
+                  <label>课程介绍 (中文, 支持 Markdown)</label>
+                  <textarea v-model="editingCourse.description" rows="4" placeholder="详细介绍这门课..."></textarea>
+                </div>
+                <div class="field-group full">
+                  <label>Course Description (English, Markdown supported)</label>
+                  <textarea v-model="editingCourse.description_en" rows="4"></textarea>
+                </div>
+                <div class="field-group">
+                  <label>现价 (¥)</label>
+                  <input v-model="editingCourse.price" type="text" placeholder="0 或 199" />
+                </div>
+                <div class="field-group">
+                  <label>原价 (¥, 可选)</label>
+                  <input v-model="editingCourse.original_price" type="text" placeholder="0" />
+                </div>
+                <div class="field-group">
+                  <label>课时数</label>
+                  <input v-model="editingCourse.lesson_count" type="text" placeholder="1" />
+                </div>
+                <div class="field-group">
+                  <label>学习人数</label>
+                  <input v-model="editingCourse.student_count" type="text" placeholder="0" />
+                </div>
+                <div class="field-group">
+                  <label>状态</label>
+                  <input v-model="editingCourse.status" placeholder="已完结 / 招生中" />
+                </div>
+                <div class="field-group">
+                  <label>有效期</label>
+                  <input v-model="editingCourse.validity" placeholder="长期有效" />
+                </div>
+                <div class="field-group">
+                  <label>排序 (小的排前面)</label>
+                  <input v-model.number="editingCourse.sort_order" type="number" />
+                </div>
+                <div class="field-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="editingCourse.active" />
+                    显示该课程
+                  </label>
+                </div>
+                <div class="field-group full">
+                  <label>教师信息</label>
+                  <div class="course-teacher-row">
+                    <div class="image-upload">
+                      <label class="upload-label">头像</label>
+                      <input type="file" accept="image/*" @change="handleCourseAvatarUpload($event, editingCourse)" :disabled="uploadLoading" />
+                      <img v-if="editingCourse.teacher_avatar" :src="getImageUrl(editingCourse.teacher_avatar)" class="preview-img avatar-preview" />
+                    </div>
+                    <div class="teacher-fields-inline">
+                      <input v-model="editingCourse.teacher_name" placeholder="教师姓名 (中)" />
+                      <input v-model="editingCourse.teacher_name_en" placeholder="Teacher Name (En)" />
+                      <input v-model="editingCourse.teacher_title" placeholder="职称 (中)" />
+                      <input v-model="editingCourse.teacher_title_en" placeholder="Title (En)" />
+                    </div>
+                  </div>
+                </div>
+                <div class="field-group full">
+                  <label>课程封面图 (Banner)</label>
+                  <div class="image-upload">
+                    <input type="file" accept="image/*" @change="handleCourseBannerUpload($event, editingCourse)" :disabled="uploadLoading" />
+                    <img v-if="editingCourse.banner_image" :src="getImageUrl(editingCourse.banner_image)" class="preview-img" />
+                  </div>
+                </div>
+                <div class="field-group full">
+                  <label>课程亮点 (Features)</label>
+                  <div v-for="(f, i) in editingCourse.features" :key="i" class="feature-row">
+                    <input v-model="f.icon" placeholder="⭐" class="feat-icon-input" />
+                    <input v-model="f.title" placeholder="亮点标题" class="feat-title-input" />
+                    <input v-model="f.desc" placeholder="亮点描述" class="feat-desc-input" />
+                    <button type="button" class="btn-mini-delete" @click="removeCourseFeature(i)">×</button>
+                  </div>
+                  <button type="button" class="btn-add-feature" @click="addCourseFeature">+ 添加亮点</button>
+                </div>
+              </div>
+              <div class="banner-actions">
+                <button class="btn-save" @click="saveCourse">保存</button>
+                <button class="btn-delete" @click="cancelEditCourse">取消</button>
+              </div>
+            </div>
+
+            <!-- 列表 -->
+            <div v-else>
+              <div v-if="courses.length === 0" class="empty-state">
+                <p>暂无课程,点击下方按钮添加第一门课程</p>
+              </div>
+              <div v-else class="course-list-admin">
+                <div v-for="c in courses" :key="c.id" class="course-admin-card">
+                  <div class="course-admin-banner">
+                    <img v-if="c.banner_image" :src="getImageUrl(c.banner_image)" />
+                    <div v-else class="card-banner-placeholder">无图</div>
+                  </div>
+                  <div class="course-admin-body">
+                    <div class="course-admin-title-row">
+                      <h4>{{ c.name }} <span v-if="c.name_en" class="en">/ {{ c.name_en }}</span></h4>
+                      <span :class="['status-badge', c.active ? 'active' : 'inactive']">
+                        {{ c.active ? '显示中' : '已隐藏' }}
+                      </span>
+                    </div>
+                    <p class="course-admin-meta">
+                      <span>¥{{ c.price }}</span>
+                      <span v-if="c.original_price && c.original_price !== '0' && c.original_price !== c.price" class="orig">¥{{ c.original_price }}</span>
+                      <span>· 排序: {{ c.sort_order || 0 }}</span>
+                      <span>· 链接: <code>/course/{{ c.course_id }}</code></span>
+                    </p>
+                    <p v-if="c.teacher_name" class="course-admin-teacher">
+                      教师: {{ c.teacher_name }}{{ c.teacher_name_en ? ' / ' + c.teacher_name_en : '' }}
+                    </p>
+                  </div>
+                  <div class="course-admin-actions">
+                    <button class="btn-edit" @click="editCourse(c)">编辑</button>
+                    <button class="btn-delete" @click="removeCourse(c)">删除</button>
+                  </div>
+                </div>
+              </div>
+              <button class="btn-add" @click="addCourse" style="margin-top:1.5rem">+ 添加课程</button>
             </div>
           </div>
 
@@ -979,6 +1256,52 @@ onMounted(() => {
 .btn-add:hover:not(:disabled) { background: var(--primary-light); }
 .btn-add:disabled { background: #909399; cursor: not-allowed; }
 
+.course-editor h3 { margin: 0 0 1.5rem; color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.75rem; }
+.course-editor .banner-fields { grid-template-columns: repeat(2, 1fr); }
+.course-editor .field-group.full { grid-column: span 2; }
+.course-editor textarea {
+  width: 100%; padding: 0.75rem; border: 1px solid #ddd;
+  border-radius: 6px; font-family: inherit; font-size: 14px;
+  resize: vertical; box-sizing: border-box;
+}
+.course-editor textarea:focus { outline: none; border-color: var(--primary-color); }
+.course-teacher-row { display: flex; gap: 1rem; align-items: flex-start; }
+.teacher-fields-inline { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; flex: 1; }
+.teacher-fields-inline input { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+.upload-label { font-size: 0.85rem; color: #666; display: block; margin-bottom: 0.25rem; }
+.preview-img.avatar-preview { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+.feature-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; }
+.feat-icon-input { width: 60px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+.feat-title-input { width: 200px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+.feat-desc-input { flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+.btn-mini-delete { background: #f56c6c; color: white; border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; }
+.btn-add-feature { padding: 0.4rem 1rem; background: #f0f9ff; color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 4px; cursor: pointer; font-size: 13px; }
+
+.course-list-admin { display: flex; flex-direction: column; gap: 1rem; }
+.course-admin-card {
+  display: flex; gap: 1rem; align-items: stretch;
+  border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 1rem; background: #fff; transition: box-shadow 0.2s;
+}
+.course-admin-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.course-admin-banner { width: 140px; flex-shrink: 0; aspect-ratio: 16/9; border-radius: 6px; overflow: hidden; background: #f0f0f0; }
+.course-admin-banner img { width: 100%; height: 100%; object-fit: cover; }
+.card-banner-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; }
+.course-admin-body { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+.course-admin-title-row { display: flex; align-items: center; gap: 0.75rem; }
+.course-admin-title-row h4 { margin: 0; font-size: 1rem; color: #333; }
+.course-admin-title-row .en { color: #888; font-weight: 400; font-size: 0.9rem; }
+.status-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.status-badge.active { background: #dcfce7; color: #16a34a; }
+.status-badge.inactive { background: #f3f4f6; color: #6b7280; }
+.course-admin-meta { margin: 0; font-size: 13px; color: #6b7280; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.course-admin-meta .orig { text-decoration: line-through; color: #999; }
+.course-admin-meta code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; font-size: 12px; color: #374151; }
+.course-admin-teacher { margin: 0; font-size: 13px; color: #6b7280; }
+.course-admin-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.btn-edit { padding: 0.5rem 1rem; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; min-width: 60px; }
+.btn-edit:hover { background: var(--primary-light); }
+
 .tool-section { margin-top: 2.5rem; padding: 1.25rem; background: #fafbfc; border: 1px dashed #d1d5db; border-radius: 8px; }
 .tool-section h3 { margin: 0 0 0.75rem; font-size: 1rem; color: #374151; }
 .tool-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
@@ -1057,6 +1380,15 @@ onMounted(() => {
   .tab { padding: 0.6rem 1rem; font-size: 0.85rem; min-height: 44px; }
   .banner-fields, .teacher-fields { grid-template-columns: 1fr; }
   .banner-item, .teacher-item { padding: 1rem; }
+  .course-editor .banner-fields { grid-template-columns: 1fr; }
+  .course-editor .field-group.full { grid-column: span 1; }
+  .course-teacher-row { flex-direction: column; }
+  .teacher-fields-inline { grid-template-columns: 1fr; }
+  .course-admin-card { flex-direction: column; }
+  .course-admin-banner { width: 100%; }
+  .course-admin-actions { flex-direction: row; }
+  .feature-row { flex-wrap: wrap; }
+  .feat-title-input, .feat-desc-input { width: 100%; flex: 1 1 100%; }
   .teacher-actions, .banner-actions { justify-content: stretch; }
   .teacher-actions button, .banner-actions button { flex: 1; min-height: 44px; }
   .setting-info { flex-direction: column; align-items: flex-start; gap: 0.5rem; }

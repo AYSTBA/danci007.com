@@ -7,19 +7,25 @@ import { getImageUrl, getAvatarUrl, formatDateShort, fetchJson } from '../utils'
 
 const route = useRoute();
 const router = useRouter();
-const courseId = computed(() => (route.params.id as string) || 'enroll');
+const hasId = computed(() => !!route.params.id);
+const courseId = computed(() => (route.params.id as string) || '');
 
 // ── 共享 composables ──
 const { currentLang, showLangDropdown, toggleLanguage, selectLanguage } = useLanguage();
 const isZh = computed(() => currentLang.value === 'zh');
 
-// ── 数据 ──
+// ── 列表状态 ──
+const courseList = ref<Course[]>([]);
+const listLoading = ref(false);
+const listError = ref<string | null>(null);
+
+// ── 详情状态 ──
 const course = ref<Course | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const activeTab = ref('detail');
 
-// 评价相关
+// 评价
 const reviews = ref<CourseReview[]>([]);
 const myRating = ref(5);
 const myReview = ref('');
@@ -28,11 +34,14 @@ const showReviewForm = ref(false);
 const reviewSubmitted = ref(false);
 const hoveredStar = ref(0);
 
-// 互动相关
+// 互动
 const interactions = ref<CourseInteraction[]>([]);
 const newComment = ref('');
 const commentName = ref('');
 const commentSubmitted = ref(false);
+
+// 分享 toast
+const showCopyTip = ref(false);
 
 // ── 图片 fallback ──
 const handleImgError = (e: Event) => {
@@ -45,8 +54,26 @@ const handleImgError = (e: Event) => {
   );
 };
 
-// ── 数据加载 ──
-const loadData = async () => {
+const handleListImgError = (e: Event) => {
+  (e.target as HTMLImageElement).style.display = 'none';
+};
+
+// ── 列表加载 ──
+const loadList = async () => {
+  listLoading.value = true;
+  listError.value = null;
+  try {
+    const data = await fetchJson<Course[]>('/api/courses');
+    courseList.value = data;
+  } catch (e: any) {
+    listError.value = e.message || '加载失败';
+  } finally {
+    listLoading.value = false;
+  }
+};
+
+// ── 详情加载 ──
+const loadDetail = async () => {
   loading.value = true;
   error.value = null;
   try {
@@ -55,7 +82,6 @@ const loadData = async () => {
     course.value = data;
   } catch (err: any) {
     error.value = err.message || '加载失败';
-    // 使用兜底数据
     course.value = {
       id: 0,
       course_id: courseId.value,
@@ -80,18 +106,20 @@ const loadData = async () => {
 };
 
 const loadReviews = async () => {
+  if (!courseId.value) return;
   try {
     reviews.value = await fetchJson<CourseReview[]>(`/api/courses/${courseId.value}/reviews`);
   } catch { /* 静默 */ }
 };
 
 const loadInteractions = async () => {
+  if (!courseId.value) return;
   try {
     interactions.value = await fetchJson<CourseInteraction[]>(`/api/courses/${courseId.value}/interactions`);
   } catch { /* 静默 */ }
 };
 
-// ── 表单提交 ──
+// ── 表单 ──
 const submitReview = async () => {
   if (!myName.value.trim() || !myReview.value.trim()) return;
   try {
@@ -120,15 +148,36 @@ const submitComment = async () => {
   } catch { /* 静默 */ }
 };
 
-const sharePage = () => {
-  if (navigator.share) {
-    navigator.share({ title: course.value?.name, url: window.location.href }).catch(() => {});
-  } else {
-    navigator.clipboard?.writeText(window.location.href);
+// ── 分享：复制文字+链接 ──
+const sharePage = async () => {
+  const c = course.value;
+  if (!c) return;
+  const url = window.location.href;
+  const title = isZh.value ? c.name : c.name_en;
+  const text = `${title}\n${url}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text, url });
+      return;
+    }
+  } catch (e: any) { /* 用户取消 */ }
+  // 降级：复制到剪贴板
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // 极旧的浏览器
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
   }
+  showCopyTip.value = true;
+  setTimeout(() => { showCopyTip.value = false; }, 2000);
 };
 
-// ── 计算属性 ──
+// ── 计算 ──
 const avgRating = computed(() => {
   if (!reviews.value.length) return '5.0';
   const sum = reviews.value.reduce((a, r) => a + r.rating, 0);
@@ -139,7 +188,6 @@ const renderStars = (rating: number) => {
   return '\u2605'.repeat(rating) + '\u2606'.repeat(5 - rating);
 };
 
-// 国际化字段
 const t = (zh: string, en: string) => isZh.value ? zh : en;
 
 watch(activeTab, (tab) => {
@@ -147,31 +195,26 @@ watch(activeTab, (tab) => {
   if (tab === 'interact') loadInteractions();
 });
 
-onMounted(loadData);
+watch(() => route.params.id, (id) => {
+  if (id) loadDetail();
+  else loadList();
+});
+
+onMounted(() => {
+  if (hasId.value) loadDetail();
+  else loadList();
+});
 </script>
 
 <template>
   <div class="course-page">
-    <!-- Loading 状态 -->
-    <div v-if="loading" class="global-loading">
-      <div class="spinner"></div>
-      <span class="loading-text">{{ t('加载中...', 'Loading...') }}</span>
-    </div>
-
-    <!-- Error 状态 -->
-    <div v-else-if="error && !course" class="global-error">
-      <div class="error-icon">!</div>
-      <div class="error-title">{{ t('加载失败', 'Failed to load') }}</div>
-      <div class="error-message">{{ error }}</div>
-      <button class="error-retry-btn" @click="loadData">{{ t('重新加载', 'Retry') }}</button>
-    </div>
-
-    <template v-else-if="course">
-      <!-- 顶部栏 -->
+    <!-- ════════════════════════════════════════════════
+         课程列表视图 (/course)
+         ════════════════════════════════════════════════ -->
+    <template v-if="!hasId">
       <header class="top-bar">
         <div class="top-left">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span class="top-title">{{ t('中萱书店知识库', 'Zhongxuan Knowledge Base') }}</span>
+          <span class="top-title">{{ t('课程中心', 'Courses') }}</span>
         </div>
         <div class="top-right">
           <div class="lang-dropdown" @click.stop>
@@ -186,188 +229,289 @@ onMounted(loadData);
         </div>
       </header>
 
-      <!-- Banner -->
-      <div class="banner">
-        <img v-if="course.banner_image" :src="getImageUrl(course.banner_image)" class="banner-img" @error="handleImgError" />
-        <div v-else class="banner-placeholder">
-          <div class="banner-inner">
-            <span class="banner-tag">{{ t('中萱书店', 'Zhongxuan') }}</span>
-            <h2 class="banner-main-title">{{ t(course.name, course.name_en) }}</h2>
-            <div class="banner-teacher-info">
-              <span class="banner-teacher-name">{{ t(course.teacher_name, course.teacher_name_en) }}</span>
-              <span class="banner-teacher-title">{{ t(course.teacher_title, course.teacher_title_en) }}</span>
-            </div>
-          </div>
-          <div class="banner-wave"></div>
-        </div>
+      <div v-if="listLoading" class="global-loading">
+        <div class="spinner"></div>
+        <span class="loading-text">{{ t('加载中...', 'Loading...') }}</span>
       </div>
 
-      <!-- 价格 + 标题 -->
-      <div class="price-section">
-        <div class="price-row">
-          <span v-if="course.price === '0'" class="price-free">{{ t('免费', 'Free') }}</span>
-          <span v-else class="price-val">&yen;{{ course.price }}</span>
-          <span v-if="course.original_price && course.original_price !== '0' && course.original_price !== course.price" class="price-orig">&yen;{{ course.original_price }}</span>
-        </div>
-        <h1 class="course-title">{{ t(course.name, course.name_en) }}</h1>
+      <div v-else-if="listError && courseList.length === 0" class="global-error">
+        <div class="error-icon">!</div>
+        <div class="error-title">{{ t('加载失败', 'Failed to load') }}</div>
+        <div class="error-message">{{ listError }}</div>
+        <button class="error-retry-btn" @click="loadList">{{ t('重新加载', 'Retry') }}</button>
       </div>
 
-      <!-- 讲师卡片 -->
-      <div class="teacher-card">
-        <div class="teacher-card-header">
-          <span class="teacher-tag">{{ t('老师信息', 'Teacher Info') }}</span>
-          <span class="teacher-home" @click="router.push('/about')">{{ t('主页', 'Home') }} &rsaquo;</span>
-        </div>
-        <div class="teacher-body">
-          <div class="teacher-left">
-            <div class="teacher-name-row">
-              <span class="teacher-name">{{ t(course.teacher_name, course.teacher_name_en) }}</span>
-              <span class="verified-badge">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--info-color)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                {{ t(course.teacher_title, course.teacher_title_en) }}
-              </span>
-            </div>
-            <p class="teacher-lesson-count">{{ t('本课程共', 'Total') }}{{ course.lesson_count || '1' }}{{ t('课时', ' lessons') }}</p>
-          </div>
-          <div class="teacher-avatar">
-            <img v-if="course.teacher_avatar" :src="getAvatarUrl(course.teacher_avatar)" @error="handleImgError" />
-            <div v-else class="avatar-placeholder">
-              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--text-light)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
-            </div>
-          </div>
-        </div>
-        <div class="teacher-stats">
-          <div class="stat">
-            <span class="stat-val">{{ course.validity || t('长期有效', 'Permanent') }}</span>
-            <span class="stat-label">{{ t('有效期', 'Validity') }}</span>
-          </div>
-          <div class="stat">
-            <span class="stat-val">{{ course.status || t('已完结', 'Complete') }}</span>
-            <span class="stat-label">{{ t('状态', 'Status') }}</span>
-          </div>
-          <div class="stat">
-            <span class="stat-val">{{ course.lesson_count || '1' }}{{ t('课时', '') }}</span>
-            <span class="stat-label">{{ t('课时数', 'Lessons') }}</span>
-          </div>
-          <div class="stat">
-            <span class="stat-val">{{ course.student_count || '11' }}{{ t('人', '') }}</span>
-            <span class="stat-label">{{ t('学习人数', 'Students') }}</span>
-          </div>
-        </div>
+      <div v-else-if="courseList.length === 0" class="empty-state">
+        <p>{{ t('暂无课程，敬请期待', 'No courses available') }}</p>
       </div>
 
-      <!-- Tab 导航 -->
-      <div class="tab-nav">
-        <button :class="['tab-btn', { active: activeTab === 'detail' }]" @click="activeTab = 'detail'">{{ t('详情', 'Details') }}</button>
-        <button :class="['tab-btn', { active: activeTab === 'interact' }]" @click="activeTab = 'interact'">{{ t('互动', 'Discuss') }}</button>
-        <button :class="['tab-btn', { active: activeTab === 'review' }]" @click="activeTab = 'review'">{{ t('评价', 'Reviews') }}</button>
-      </div>
-
-      <!-- Tab 内容 -->
-      <div class="tab-content">
-        <!-- 详情 -->
-        <div v-show="activeTab === 'detail'" class="detail-panel">
-          <div v-if="course.banner_image" class="detail-banner">
-            <img :src="getImageUrl(course.banner_image)" @error="handleImgError" />
-          </div>
-          <div class="detail-text">
-            <p>{{ t(course.description, course.description_en) }}</p>
-          </div>
-          <div v-if="course.features?.length" class="detail-features">
-            <div v-for="(f, i) in course.features" :key="i" class="feat-item">
-              <span class="feat-icon">{{ f.icon }}</span>
-              <div>
-                <h4>{{ f.title }}</h4>
-                <p>{{ f.desc }}</p>
+      <div v-else class="course-list-wrap">
+        <div class="course-list-header">
+          <h2 class="list-title">{{ t('精选课程', 'Featured Courses') }}</h2>
+          <p class="list-subtitle">{{ t('左右滑动浏览，点击查看详情', 'Swipe to browse, tap to view details') }}</p>
+        </div>
+        <div class="course-list">
+          <div
+            v-for="c in courseList"
+            :key="c.id"
+            class="course-card"
+            @click="router.push(`/course/${c.course_id}`)"
+          >
+            <div class="card-banner">
+              <img
+                v-if="c.banner_image"
+                :src="getImageUrl(c.banner_image)"
+                :alt="c.name"
+                @error="handleListImgError"
+              />
+              <div v-else class="card-banner-placeholder">
+                <span>{{ t(c.name, c.name_en).slice(0, 8) }}</span>
               </div>
+              <div v-if="c.price === '0' || c.price === ''" class="card-tag-free">{{ t('免费', 'Free') }}</div>
+              <div v-else class="card-tag-price">¥{{ c.price }}</div>
             </div>
-          </div>
-        </div>
-
-        <!-- 互动 -->
-        <div v-show="activeTab === 'interact'" class="interact-panel">
-          <div class="comment-input-area">
-            <input v-model="commentName" :placeholder="t('您的昵称', 'Your nickname')" class="comment-name-input" />
-            <div class="comment-row">
-              <input v-model="newComment" :placeholder="t('说点什么...', 'Say something...')" class="comment-input" @keyup.enter="submitComment" />
-              <button class="comment-send" @click="submitComment">{{ t('发送', 'Send') }}</button>
-            </div>
-          </div>
-          <div v-if="commentSubmitted" class="comment-tip">&check; {{ t('发布成功', 'Posted') }}</div>
-          <div class="comment-list">
-            <div v-if="!interactions.length" class="empty-tip">{{ t('暂无互动，快来抢沙发~', 'No comments yet, be the first!') }}</div>
-            <div v-for="item in interactions" :key="item.id" class="comment-item">
-              <div class="comment-avatar">{{ item.name?.charAt(0) || '?' }}</div>
-              <div class="comment-body">
-                <div class="comment-meta">
-                  <span class="comment-name">{{ item.name }}</span>
-                  <span class="comment-time">{{ formatDateShort(item.created_at) }}</span>
+            <div class="card-body">
+              <h3 class="card-title">{{ t(c.name, c.name_en) }}</h3>
+              <p v-if="c.subtitle || c.subtitle_en" class="card-subtitle">
+                {{ t(c.subtitle, c.subtitle_en) }}
+              </p>
+              <div class="card-footer">
+                <div class="card-teacher">
+                  <img
+                    v-if="c.teacher_avatar"
+                    :src="getAvatarUrl(c.teacher_avatar)"
+                    @error="handleListImgError"
+                  />
+                  <div v-else class="card-avatar-placeholder">
+                    {{ t(c.teacher_name, c.teacher_name_en).charAt(0) }}
+                  </div>
+                  <span>{{ t(c.teacher_name, c.teacher_name_en) }}</span>
                 </div>
-                <p class="comment-text">{{ item.content }}</p>
+                <span class="card-arrow">›</span>
               </div>
             </div>
           </div>
         </div>
+      </div>
+    </template>
 
-        <!-- 评价 -->
-        <div v-show="activeTab === 'review'" class="review-panel">
-          <div class="review-summary">
-            <div class="summary-left">
-              <span class="summary-score">{{ avgRating }}</span>
-              <div class="summary-stars">{{ renderStars(Math.round(Number(avgRating))) }}</div>
-              <span class="summary-count">{{ reviews.length }}{{ t('条评价', ' reviews') }}</span>
-            </div>
-            <button class="write-review-btn" @click="showReviewForm = !showReviewForm">{{ t('写评价', 'Write Review') }}</button>
+    <!-- ════════════════════════════════════════════════
+         课程详情视图 (/course/:id)
+         ════════════════════════════════════════════════ -->
+    <template v-else>
+      <div v-if="loading" class="global-loading">
+        <div class="spinner"></div>
+        <span class="loading-text">{{ t('加载中...', 'Loading...') }}</span>
+      </div>
+
+      <div v-else-if="error && !course" class="global-error">
+        <div class="error-icon">!</div>
+        <div class="error-title">{{ t('加载失败', 'Failed to load') }}</div>
+        <div class="error-message">{{ error }}</div>
+        <button class="error-retry-btn" @click="loadDetail">{{ t('重新加载', 'Retry') }}</button>
+      </div>
+
+      <template v-else-if="course">
+        <header class="top-bar">
+          <div class="top-left">
+            <button class="back-btn" @click="router.push('/course')" :title="t('返回课程列表', 'Back')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="top-title">{{ t('中萱书店知识库', 'Zhongxuan Knowledge Base') }}</span>
           </div>
-
-          <div v-if="showReviewForm" class="review-form">
-            <input v-model="myName" :placeholder="t('您的昵称', 'Your nickname')" class="review-name-input" />
-            <div class="rating-select">
-              <span class="rating-label">{{ t('评分', 'Rating') }}</span>
-              <div class="star-select">
-                <span v-for="s in 5" :key="s" class="star-btn" :class="{ active: s <= (hoveredStar || myRating) }" @click="myRating = s" @mouseenter="hoveredStar = s" @mouseleave="hoveredStar = 0">&starf;</span>
+          <div class="top-right">
+            <div class="lang-dropdown" @click.stop>
+              <button class="lang-btn" @click="toggleLanguage">
+                {{ currentLang === 'zh' ? 'EN' : '中' }}
+              </button>
+              <div v-if="showLangDropdown" class="lang-menu">
+                <div :class="['lang-option', { active: currentLang === 'zh' }]" @click="selectLanguage('zh')">中文</div>
+                <div :class="['lang-option', { active: currentLang === 'en' }]" @click="selectLanguage('en')">English</div>
               </div>
-              <span class="rating-text">{{ myRating }}.0</span>
             </div>
-            <textarea v-model="myReview" :placeholder="t('分享您的学习体验...', 'Share your learning experience...')" class="review-textarea" rows="3"></textarea>
-            <button class="review-submit" @click="submitReview">{{ t('提交评价', 'Submit Review') }}</button>
           </div>
-          <div v-if="reviewSubmitted" class="review-tip">&check; {{ t('评价发布成功', 'Review submitted') }}</div>
+        </header>
 
-          <div class="review-list">
-            <div v-if="!reviews.length" class="empty-tip">{{ t('暂无评价', 'No reviews yet') }}</div>
-            <div v-for="r in reviews" :key="r.id" class="review-item">
-              <div class="review-header">
-                <span class="review-avatar">{{ r.name?.charAt(0) || '?' }}</span>
-                <div class="review-meta">
-                  <span class="review-name">{{ r.name }}</span>
-                  <span class="review-stars">{{ renderStars(r.rating) }}</span>
+        <div class="banner">
+          <img v-if="course.banner_image" :src="getImageUrl(course.banner_image)" class="banner-img" @error="handleImgError" />
+          <div v-else class="banner-placeholder">
+            <div class="banner-inner">
+              <span class="banner-tag">{{ t('中萱书店', 'Zhongxuan') }}</span>
+              <h2 class="banner-main-title">{{ t(course.name, course.name_en) }}</h2>
+              <div class="banner-teacher-info">
+                <span class="banner-teacher-name">{{ t(course.teacher_name, course.teacher_name_en) }}</span>
+                <span class="banner-teacher-title">{{ t(course.teacher_title, course.teacher_title_en) }}</span>
+              </div>
+            </div>
+            <div class="banner-wave"></div>
+          </div>
+        </div>
+
+        <div class="price-section">
+          <div class="price-row">
+            <span v-if="course.price === '0'" class="price-free">{{ t('免费', 'Free') }}</span>
+            <span v-else class="price-val">&yen;{{ course.price }}</span>
+            <span v-if="course.original_price && course.original_price !== '0' && course.original_price !== course.price" class="price-orig">&yen;{{ course.original_price }}</span>
+          </div>
+          <h1 class="course-title">{{ t(course.name, course.name_en) }}</h1>
+        </div>
+
+        <div class="teacher-card">
+          <div class="teacher-card-header">
+            <span class="teacher-tag">{{ t('老师信息', 'Teacher Info') }}</span>
+            <span class="teacher-home" @click="router.push('/about')">{{ t('主页', 'Home') }} &rsaquo;</span>
+          </div>
+          <div class="teacher-body">
+            <div class="teacher-left">
+              <div class="teacher-name-row">
+                <span class="teacher-name">{{ t(course.teacher_name, course.teacher_name_en) }}</span>
+                <span class="verified-badge">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--info-color)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                  {{ t(course.teacher_title, course.teacher_title_en) }}
+                </span>
+              </div>
+              <p class="teacher-lesson-count">{{ t('本课程共', 'Total') }}{{ course.lesson_count || '1' }}{{ t('课时', ' lessons') }}</p>
+            </div>
+            <div class="teacher-avatar">
+              <img v-if="course.teacher_avatar" :src="getAvatarUrl(course.teacher_avatar)" @error="handleImgError" />
+              <div v-else class="avatar-placeholder">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--text-light)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="teacher-stats">
+            <div class="stat">
+              <span class="stat-val">{{ course.validity || t('长期有效', 'Permanent') }}</span>
+              <span class="stat-label">{{ t('有效期', 'Validity') }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val">{{ course.status || t('已完结', 'Complete') }}</span>
+              <span class="stat-label">{{ t('状态', 'Status') }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val">{{ course.lesson_count || '1' }}{{ t('课时', '') }}</span>
+              <span class="stat-label">{{ t('课时数', 'Lessons') }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-val">{{ course.student_count || '11' }}{{ t('人', '') }}</span>
+              <span class="stat-label">{{ t('学习人数', 'Students') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-nav">
+          <button :class="['tab-btn', { active: activeTab === 'detail' }]" @click="activeTab = 'detail'">{{ t('详情', 'Details') }}</button>
+          <button :class="['tab-btn', { active: activeTab === 'interact' }]" @click="activeTab = 'interact'">{{ t('互动', 'Discuss') }}</button>
+          <button :class="['tab-btn', { active: activeTab === 'review' }]" @click="activeTab = 'review'">{{ t('评价', 'Reviews') }}</button>
+        </div>
+
+        <div class="tab-content">
+          <div v-show="activeTab === 'detail'" class="detail-panel">
+            <div v-if="course.banner_image" class="detail-banner">
+              <img :src="getImageUrl(course.banner_image)" @error="handleImgError" />
+            </div>
+            <div class="detail-text">
+              <p>{{ t(course.description, course.description_en) }}</p>
+            </div>
+            <div v-if="course.features?.length" class="detail-features">
+              <div v-for="(f, i) in course.features" :key="i" class="feat-item">
+                <span class="feat-icon">{{ f.icon }}</span>
+                <div>
+                  <h4>{{ f.title }}</h4>
+                  <p>{{ f.desc }}</p>
                 </div>
-                <span class="review-time">{{ formatDateShort(r.created_at) }}</span>
               </div>
-              <p class="review-content">{{ r.content }}</p>
+            </div>
+          </div>
+
+          <div v-show="activeTab === 'interact'" class="interact-panel">
+            <div class="comment-input-area">
+              <input v-model="commentName" :placeholder="t('您的昵称', 'Your nickname')" class="comment-name-input" />
+              <div class="comment-row">
+                <input v-model="newComment" :placeholder="t('说点什么...', 'Say something...')" class="comment-input" @keyup.enter="submitComment" />
+                <button class="comment-send" @click="submitComment">{{ t('发送', 'Send') }}</button>
+              </div>
+            </div>
+            <div v-if="commentSubmitted" class="comment-tip">&check; {{ t('发布成功', 'Posted') }}</div>
+            <div class="comment-list">
+              <div v-if="!interactions.length" class="empty-tip">{{ t('暂无互动，快来抢沙发~', 'No comments yet, be the first!') }}</div>
+              <div v-for="item in interactions" :key="item.id" class="comment-item">
+                <div class="comment-avatar">{{ item.name?.charAt(0) || '?' }}</div>
+                <div class="comment-body">
+                  <div class="comment-meta">
+                    <span class="comment-name">{{ item.name }}</span>
+                    <span class="comment-time">{{ formatDateShort(item.created_at) }}</span>
+                  </div>
+                  <p class="comment-text">{{ item.content }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-show="activeTab === 'review'" class="review-panel">
+            <div class="review-summary">
+              <div class="summary-left">
+                <span class="summary-score">{{ avgRating }}</span>
+                <div class="summary-stars">{{ renderStars(Math.round(Number(avgRating))) }}</div>
+                <span class="summary-count">{{ reviews.length }}{{ t('条评价', ' reviews') }}</span>
+              </div>
+              <button class="write-review-btn" @click="showReviewForm = !showReviewForm">{{ t('写评价', 'Write Review') }}</button>
+            </div>
+
+            <div v-if="showReviewForm" class="review-form">
+              <input v-model="myName" :placeholder="t('您的昵称', 'Your nickname')" class="review-name-input" />
+              <div class="rating-select">
+                <span class="rating-label">{{ t('评分', 'Rating') }}</span>
+                <div class="star-select">
+                  <span v-for="s in 5" :key="s" class="star-btn" :class="{ active: s <= (hoveredStar || myRating) }" @click="myRating = s" @mouseenter="hoveredStar = s" @mouseleave="hoveredStar = 0">&starf;</span>
+                </div>
+                <span class="rating-text">{{ myRating }}.0</span>
+              </div>
+              <textarea v-model="myReview" :placeholder="t('分享您的学习体验...', 'Share your learning experience...')" class="review-textarea" rows="3"></textarea>
+              <button class="review-submit" @click="submitReview">{{ t('提交评价', 'Submit Review') }}</button>
+            </div>
+            <div v-if="reviewSubmitted" class="review-tip">&check; {{ t('评价发布成功', 'Review submitted') }}</div>
+
+            <div class="review-list">
+              <div v-if="!reviews.length" class="empty-tip">{{ t('暂无评价', 'No reviews yet') }}</div>
+              <div v-for="r in reviews" :key="r.id" class="review-item">
+                <div class="review-header">
+                  <span class="review-avatar">{{ r.name?.charAt(0) || '?' }}</span>
+                  <div class="review-meta">
+                    <span class="review-name">{{ r.name }}</span>
+                    <span class="review-stars">{{ renderStars(r.rating) }}</span>
+                  </div>
+                  <span class="review-time">{{ formatDateShort(r.created_at) }}</span>
+                </div>
+                <p class="review-content">{{ r.content }}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 底部安全区 -->
-      <div class="safe-bottom"></div>
+        <div class="safe-bottom"></div>
 
-      <!-- 底部操作栏 -->
-      <div class="bottom-bar">
-        <div class="bottom-actions">
-          <router-link to="/" class="action-item">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            <span>{{ t('首页', 'Home') }}</span>
-          </router-link>
-          <div class="action-item" @click="sharePage">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            <span>{{ t('分享', 'Share') }}</span>
+        <div class="bottom-bar">
+          <div class="bottom-actions">
+            <router-link to="/" class="action-item">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span>{{ t('首页', 'Home') }}</span>
+            </router-link>
+            <div class="action-item" @click="sharePage">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              <span>{{ t('分享', 'Share') }}</span>
+            </div>
           </div>
+          <button class="enter-btn" @click="router.push('/booking')">{{ t('立即预约', 'Book Now') }}</button>
         </div>
-        <button class="enter-btn" @click="router.push('/booking')">{{ t('立即预约', 'Book Now') }}</button>
-      </div>
+
+        <!-- 复制提示 toast -->
+        <transition name="fade">
+          <div v-if="showCopyTip" class="copy-tip">
+            ✓ {{ t('链接已复制到剪贴板', 'Link copied to clipboard') }}
+          </div>
+        </transition>
+      </template>
     </template>
   </div>
 </template>
@@ -405,6 +549,11 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   gap: var(--sp-4);
+}
+.back-btn {
+  background: none; border: none; padding: 4px;
+  color: var(--text-primary); cursor: pointer;
+  display: flex; align-items: center;
 }
 
 /* ── 语言切换 ── */
@@ -444,6 +593,182 @@ onMounted(loadData);
 }
 .lang-option:hover { background: var(--bg-secondary); }
 .lang-option.active { color: var(--primary-color); font-weight: 600; }
+
+/* ════════════════════════════════════════════════
+   课程列表视图
+   ════════════════════════════════════════════════ */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-light);
+}
+
+.course-list-wrap {
+  padding: var(--sp-4);
+}
+.course-list-header {
+  margin-bottom: var(--sp-4);
+}
+.list-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+.list-subtitle {
+  font-size: 13px;
+  color: var(--text-light);
+  margin: 0;
+}
+
+/* 横向滑动列表 */
+.course-list {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 16px;
+  margin: 0 calc(-1 * var(--sp-4));
+  padding-left: var(--sp-4);
+  padding-right: var(--sp-4);
+  scrollbar-width: thin;
+}
+.course-list::-webkit-scrollbar {
+  height: 4px;
+}
+.course-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+.course-card {
+  flex: 0 0 calc(100% - 40px);
+  max-width: 320px;
+  background: var(--bg-primary);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.course-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+.card-banner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--primary-lighter), var(--primary-light));
+}
+.card-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.card-banner-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+}
+.card-tag-free,
+.card-tag-price {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.95);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.card-tag-free { background: rgba(76, 175, 80, 0.95); }
+.card-tag-price { background: rgba(245, 158, 11, 0.95); }
+
+.card-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-subtitle {
+  font-size: 13px;
+  color: var(--text-light);
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+}
+.card-teacher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+}
+.card-teacher img,
+.card-avatar-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.card-avatar-placeholder {
+  background: var(--primary-lighter);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+.card-teacher span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-arrow {
+  color: var(--text-light);
+  font-size: 20px;
+  font-weight: 300;
+}
 
 /* ── Banner ── */
 .banner { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; }
@@ -695,4 +1020,21 @@ onMounted(loadData);
 }
 .enter-btn:active { opacity: 0.9; }
 .safe-bottom { height: 20px; }
+
+/* ── 复制提示 ── */
+.copy-tip {
+  position: fixed;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 22px;
+  font-size: 14px;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
