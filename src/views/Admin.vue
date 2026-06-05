@@ -40,6 +40,56 @@ const uploadLoading = ref(false);
 const uploadProgress = ref(0);
 const uploadFileName = ref('');
 const uploadPhase = ref<'uploading' | 'processing'>('uploading');
+let currentUploadXhr: XMLHttpRequest | null = null;
+
+// ── 孤儿文件清理 ──
+const orphanInfo = ref<{ orphans: string[]; count: number; totalSize: number } | null>(null);
+const orphanScanning = ref(false);
+
+const formatSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+};
+
+const scanOrphans = async () => {
+  orphanScanning.value = true;
+  try {
+    const r = await authFetch('/api/admin/orphan-uploads');
+    if (r.ok) orphanInfo.value = await r.json();
+    else alert('扫描失败');
+  } catch (e: any) {
+    alert('扫描出错: ' + e.message);
+  } finally {
+    orphanScanning.value = false;
+  }
+};
+
+const cleanupOrphans = async (olderThanHours: number) => {
+  const msg = olderThanHours > 0
+    ? `确定删除 ${olderThanHours} 小时前未引用的文件？此操作不可撤销！`
+    : '确定删除所有未引用的文件？此操作不可撤销！';
+  if (!confirm(msg)) return;
+  orphanScanning.value = true;
+  try {
+    const r = await authFetch('/api/admin/orphan-uploads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ olderThanHours })
+    });
+    if (r.ok) {
+      const data = await r.json();
+      showSaveSuccess(`已清理 ${data.deleted} 个文件`);
+      await scanOrphans();
+    } else {
+      alert('清理失败');
+    }
+  } catch (e: any) {
+    alert('清理出错: ' + e.message);
+  } finally {
+    orphanScanning.value = false;
+  }
+};
 
 const showSaveSuccess = (message: string) => {
   saveMessage.value = message;
@@ -350,13 +400,29 @@ const removeBanner = (banner: Banner) => {
   }
 };
 
+const cancelUpload = () => {
+  if (currentUploadXhr) {
+    try { currentUploadXhr.abort(); } catch {}
+    currentUploadXhr = null;
+  }
+  uploadLoading.value = false;
+  uploadProgress.value = 0;
+};
+
 const uploadImage = (file: File): Promise<string | null> => {
+  // 如果有进行中的上传，先取消它
+  if (currentUploadXhr) {
+    try { currentUploadXhr.abort(); } catch {}
+    currentUploadXhr = null;
+  }
+
   return new Promise((resolve) => {
     const formData = new FormData();
     formData.append('file', file);
     const xhr = new XMLHttpRequest();
     const token = sessionStorage.getItem('adminToken');
 
+    currentUploadXhr = xhr;
     uploadLoading.value = true;
     uploadProgress.value = 0;
     uploadFileName.value = file.name;
@@ -373,6 +439,7 @@ const uploadImage = (file: File): Promise<string | null> => {
     };
 
     xhr.onload = () => {
+      if (currentUploadXhr === xhr) currentUploadXhr = null;
       uploadLoading.value = false;
       if (xhr.status === 401 || xhr.status === 403) {
         handleLogout();
@@ -397,12 +464,17 @@ const uploadImage = (file: File): Promise<string | null> => {
     };
 
     xhr.onerror = () => {
-      uploadLoading.value = false;
-      alert('网络错误，上传失败');
+      if (currentUploadXhr === xhr) currentUploadXhr = null;
+      // 只有在非主动取消时才报错
+      if (uploadLoading.value) {
+        uploadLoading.value = false;
+        alert('网络错误，上传失败');
+      }
       resolve(null);
     };
 
     xhr.onabort = () => {
+      if (currentUploadXhr === xhr) currentUploadXhr = null;
       uploadLoading.value = false;
       resolve(null);
     };
@@ -441,11 +513,16 @@ const handleMarkdownUploadSimple = (event: Event, key: string) => {
   }
 };
 
-const handleEditorConfirm = async (file: File) => {
-  if (editorCallback.value) await editorCallback.value(file);
+const handleEditorConfirm = (file: File) => {
+  // 立刻关闭编辑器，给用户即时反馈
+  const cb = editorCallback.value;
   editorVisible.value = false;
   editorFile.value = null;
   editorCallback.value = null;
+  // 异步执行上传（cb 内部会启动 uploadImage 并显示遮罩）
+  if (cb) {
+    cb(file);
+  }
 };
 
 const handleEditorCancel = () => {
@@ -506,6 +583,7 @@ onMounted(() => {
             <div class="upload-overlay-progress-bar" :style="{ width: uploadProgress + '%' }"></div>
           </div>
           <div class="upload-overlay-percent">{{ uploadProgress }}%</div>
+          <button class="upload-overlay-cancel" @click="cancelUpload">取消上传</button>
         </div>
       </div>
 
@@ -585,6 +663,33 @@ onMounted(() => {
               </div>
             </div>
             <button class="btn-add" @click="addBanner()">+ 添加活动</button>
+
+            <!-- 工具区: 清理未引用的上传文件 -->
+            <div class="tool-section">
+              <h3>🧹 存储管理</h3>
+              <div class="tool-row">
+                <button class="btn-tool" @click="scanOrphans" :disabled="orphanScanning">
+                  {{ orphanScanning ? '扫描中…' : '扫描未引用的文件' }}
+                </button>
+                <span v-if="orphanInfo" class="tool-info">
+                  发现 <strong :class="{ 'has-orphans': orphanInfo.count > 0 }">{{ orphanInfo.count }}</strong> 个未引用文件，
+                  共 <strong>{{ formatSize(orphanInfo.totalSize) }}</strong>
+                </span>
+              </div>
+              <div v-if="orphanInfo && orphanInfo.orphans.length > 0" class="orphan-list">
+                <div v-for="f in orphanInfo.orphans" :key="f" class="orphan-item">
+                  <span class="orphan-name" :title="f">{{ f }}</span>
+                </div>
+                <div class="orphan-actions">
+                  <button class="btn-tool btn-tool-danger" @click="cleanupOrphans(24)" :disabled="orphanScanning">
+                    清理 24 小时前
+                  </button>
+                  <button class="btn-tool btn-tool-danger" @click="cleanupOrphans(0)" :disabled="orphanScanning">
+                    全部清理
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Contents Tab -->
@@ -873,6 +978,22 @@ onMounted(() => {
 .btn-add { padding: 0.75rem 2rem; background: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
 .btn-add:hover:not(:disabled) { background: var(--primary-light); }
 .btn-add:disabled { background: #909399; cursor: not-allowed; }
+
+.tool-section { margin-top: 2.5rem; padding: 1.25rem; background: #fafbfc; border: 1px dashed #d1d5db; border-radius: 8px; }
+.tool-section h3 { margin: 0 0 0.75rem; font-size: 1rem; color: #374151; }
+.tool-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.tool-info { font-size: 0.9rem; color: #6b7280; }
+.tool-info .has-orphans { color: #f59e0b; }
+.orphan-list { margin-top: 0.75rem; max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.5rem; }
+.orphan-item { padding: 0.25rem 0.5rem; font-size: 0.8rem; font-family: monospace; color: #6b7280; border-bottom: 1px solid #f3f4f6; }
+.orphan-item:last-child { border-bottom: none; }
+.orphan-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orphan-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+.btn-tool { padding: 0.5rem 1rem; background: #fff; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+.btn-tool:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+.btn-tool:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-tool-danger { color: #dc2626; border-color: #fca5a5; }
+.btn-tool-danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
 
 .simple-contents h3 { margin: 0 0 1.5rem; color: #333; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.75rem; }
 .content-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; }

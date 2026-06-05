@@ -334,6 +334,28 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.upload-overlay-cancel {
+  margin-top: 6px;
+  padding: 8px 20px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upload-overlay-cancel:hover {
+  background: #f3f4f6;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.upload-overlay-cancel:active {
+  transform: scale(0.97);
+}
+
 /* ══════════════════════════════════════════════
    共享 Error 组件
    ══════════════════════════════════════════════ */
