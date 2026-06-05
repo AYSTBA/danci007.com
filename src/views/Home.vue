@@ -35,6 +35,36 @@ function fallbackImg(e: Event) {
 const { currentBannerIndex, stopAutoPlay, nextBanner, prevBanner } =
   useBannerCarousel(banners);
 
+// ── 触摸滑动支持 ──
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchStartTime = 0;
+
+const onTouchStart = (e: TouchEvent) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+  stopAutoPlay();
+};
+
+const onTouchMove = (e: TouchEvent) => {
+  const dx = Math.abs(e.touches[0].clientX - touchStartX);
+  const dy = Math.abs(e.touches[0].clientY - touchStartY);
+  if (dx > dy && dx > 10) e.preventDefault();
+};
+
+const onTouchEnd = (e: TouchEvent) => {
+  touchEndX = e.changedTouches[0].clientX;
+  const dx = touchStartX - touchEndX;
+  const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+  const elapsed = Date.now() - touchStartTime;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > dy * 1.5 && elapsed < 800) {
+    if (dx > 0) nextBanner();
+    else prevBanner();
+  }
+};
+
 // ── 滚动 ──
 const sections = ['hero', 'why', 'teachers', 'gallery'];
 const activeBallIndex = ref(-1); // 默认不激活
@@ -237,23 +267,24 @@ const siteTitle = computed(() => {
     <section id="hero" class="hero-section">
       <div class="hero-inner">
         <div class="hero-banner-wrapper">
-          <div class="hero-banner">
+          <div class="hero-banner" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
             <img
               v-for="(banner, index) in banners"
               :key="banner.id"
               :src="getImageUrl(currentLang === 'en' && banner.image_url_en ? banner.image_url_en : banner.image_url)"
               :alt="currentLang === 'en' && banner.title_en ? banner.title_en : banner.title"
               :class="['banner-img', { active: index === currentBannerIndex }]"
+              draggable="false"
             />
             <div v-if="banners.length === 0" class="banner-placeholder">
               <span>{{ currentLang === 'zh' ? '活动图片' : 'Activity Image' }}</span>
             </div>
-            <button class="banner-nav-prev glass-btn" @click="prevBanner">
+            <button class="banner-nav-prev glass-btn" @click.stop="prevBanner">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 19l-7-7 7-7"/>
               </svg>
             </button>
-            <button class="banner-nav-next glass-btn" @click="nextBanner">
+            <button class="banner-nav-next glass-btn" @click.stop="nextBanner">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 5l7 7-7 7"/>
               </svg>
@@ -1116,7 +1147,7 @@ const siteTitle = computed(() => {
 
   /* ── Banner ── */
   .hero-section {
-    padding-top: 0;
+    padding-top: calc(64px + var(--safe-top, 0px));
     min-height: auto;
     padding-bottom: 24px;
   }
@@ -1135,6 +1166,7 @@ const siteTitle = computed(() => {
     min-height: 200px;
     max-height: 300px;
     border-radius: 16px;
+    touch-action: pan-y;
   }
 
   .banner-nav-prev {
