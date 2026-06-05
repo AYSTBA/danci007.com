@@ -171,9 +171,11 @@ const initDb = () => {
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
       email TEXT DEFAULT '',
+      age TEXT DEFAULT '',
       date TEXT DEFAULT '',
       time TEXT DEFAULT '',
       course TEXT DEFAULT '',
+      course_name TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -235,6 +237,9 @@ const initDb = () => {
   // 兼容旧表：补齐缺失列
   for (const col of ['lesson_count', 'student_count', 'status', 'validity', 'sort_order']) {
     try { db.exec(`ALTER TABLE courses ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
+  }
+  for (const col of ['age', 'course_name']) {
+    try { db.exec(`ALTER TABLE bookings ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
   }
 
   const defaultContents = db.prepare('SELECT COUNT(*) as count FROM page_contents').get().count;
@@ -421,18 +426,27 @@ app.get('/api/bookings', requireAdminAuth, (req, res) => {
 });
 
 app.post('/api/bookings', (req, res) => {
-  const { name, phone, email, date, time, course } = req.body;
+  const { name, age, phone, email, course, course_name } = req.body;
   if (!name || !phone) {
     return res.status(400).json({ error: '姓名和电话不能为空' });
   }
   if (name.length > 50 || phone.length > 30) {
     return res.status(400).json({ error: '姓名或电话过长' });
   }
+  if (age && (isNaN(Number(age)) || Number(age) < 1 || Number(age) > 120)) {
+    return res.status(400).json({ error: '年龄必须在 1-120 之间' });
+  }
   const result = db.prepare(`
-    INSERT INTO bookings (name, phone, email, date, time, course)
+    INSERT INTO bookings (name, phone, email, age, course, course_name)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name.trim(), phone.trim(), (email || '').trim(), date || '', time || '', course || '');
-  
+  `).run(
+    name.trim(), phone.trim(),
+    (email || '').trim(),
+    age ? String(age).trim() : '',
+    course || '',
+    course_name || ''
+  );
+
   res.json({ success: true, id: result.lastInsertRowid });
 });
 

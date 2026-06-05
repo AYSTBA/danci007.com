@@ -148,13 +148,22 @@ const submitComment = async () => {
   } catch { /* 静默 */ }
 };
 
-// ── 分享：复制文字+链接 ──
+// ── 分享：友好文案 + 链接（不含任何 ID）──
+
+// ── 预约：跳转到预约页并附带课程ID ──
+const handleBook = () => {
+  if (!course.value) return;
+  router.push(`/booking?course=${encodeURIComponent(course.value.course_id)}`);
+};
+
 const sharePage = async () => {
   const c = course.value;
   if (!c) return;
   const url = window.location.href;
   const title = isZh.value ? c.name : c.name_en;
-  const text = `${title}\n${url}`;
+  const text = isZh.value
+    ? `欢迎来体验【${title}】\n${url}`
+    : `Welcome to try【${title}】\n${url}`;
   try {
     if (navigator.share) {
       await navigator.share({ title, text, url });
@@ -248,7 +257,7 @@ onMounted(() => {
       <div v-else class="course-list-wrap">
         <div class="course-list-header">
           <h2 class="list-title">{{ t('精选课程', 'Featured Courses') }}</h2>
-          <p class="list-subtitle">{{ t('左右滑动浏览，点击查看详情', 'Swipe to browse, tap to view details') }}</p>
+          <p class="list-subtitle">{{ t('点击查看课程详情', 'Tap to view course details') }}</p>
         </div>
         <div class="course-list">
           <div
@@ -317,7 +326,7 @@ onMounted(() => {
             <button class="back-btn" @click="router.push('/course')" :title="t('返回课程列表', 'Back')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <span class="top-title">{{ t('中萱书店知识库', 'Zhongxuan Knowledge Base') }}</span>
+            <span class="top-title">{{ t(course.name, course.name_en) }}</span>
           </div>
           <div class="top-right">
             <div class="lang-dropdown" @click.stop>
@@ -502,7 +511,7 @@ onMounted(() => {
               <span>{{ t('分享', 'Share') }}</span>
             </div>
           </div>
-          <button class="enter-btn" @click="router.push('/booking')">{{ t('立即预约', 'Book Now') }}</button>
+          <button class="enter-btn" @click="handleBook">{{ t('立即预约', 'Book Now') }}</button>
         </div>
 
         <!-- 复制提示 toast -->
@@ -621,34 +630,31 @@ onMounted(() => {
   margin: 0;
 }
 
-/* 横向滑动列表 */
+/* 课程列表：移动端竖向、桌面端网格 */
 .course-list {
   display: flex;
+  flex-direction: column;
   gap: var(--sp-4);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 4px 16px;
-  margin: 0 calc(-1 * var(--sp-4));
-  padding-left: var(--sp-4);
-  padding-right: var(--sp-4);
-  scrollbar-width: thin;
+  padding: 4px 0 16px;
 }
-.course-list::-webkit-scrollbar {
-  height: 4px;
+@media (min-width: 900px) {
+  .course-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-4);
+  }
 }
-.course-list::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
+@media (min-width: 1200px) {
+  .course-list {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 .course-card {
-  flex: 0 0 calc(100% - 40px);
-  max-width: 320px;
+  width: 100%;
   background: var(--bg-primary);
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  scroll-snap-align: start;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;

@@ -214,7 +214,6 @@ const addTeacher = () => {
 
 // ── 课程管理 ──
 const newCourseTemplate = () => ({
-  id: Date.now(),
   course_id: '',
   name: '',
   name_en: '',
@@ -236,8 +235,23 @@ const newCourseTemplate = () => ({
   status: '已完结',
   validity: '长期有效',
   sort_order: 0,
-  active: true
+  active: true,
+  _teacherId: '' as any
 });
+
+// 从教师下拉中选择后，自动填充教师信息到课程
+const applyTeacherFromList = (course: any) => {
+  const id = Number(course._teacherId);
+  const t = teachers.value.find(x => x.id === id);
+  if (!t) return;
+  course.teacher_name = t.name || '';
+  course.teacher_name_en = t.name_en || '';
+  course.teacher_title = t.title || '';
+  course.teacher_title_en = t.title_en || '';
+  if (t.avatar && !course.teacher_avatar) {
+    course.teacher_avatar = t.avatar;
+  }
+};
 
 const addCourse = () => {
   editingCourse.value = newCourseTemplate();
@@ -245,11 +259,17 @@ const addCourse = () => {
 
 const editCourse = (c: any) => {
   editingCourse.value = JSON.parse(JSON.stringify(c));
+  editingCourse.value._teacherId = '';
   // 把 features 字符串/数组统一
   if (typeof editingCourse.value.features === 'string') {
     try { editingCourse.value.features = JSON.parse(editingCourse.value.features); } catch { editingCourse.value.features = []; }
   }
   if (!Array.isArray(editingCourse.value.features)) editingCourse.value.features = [];
+  // 尝试通过教师姓名匹配已存在的教师
+  if (editingCourse.value.teacher_name) {
+    const matched = teachers.value.find(t => t.name === editingCourse.value.teacher_name);
+    if (matched) editingCourse.value._teacherId = matched.id;
+  }
 };
 
 const cancelEditCourse = () => {
@@ -264,7 +284,8 @@ const saveCourse = async () => {
     return;
   }
   try {
-    const data = { ...c, active: c.active ? 1 : 0 };
+    const { _teacherId, ...payload } = c;
+    const data = { ...payload, active: c.active ? 1 : 0 };
     let response;
     if (c.id > 1000000000000 || !courses.value.find(x => x.id === c.id)) {
       // 新建
@@ -892,18 +913,24 @@ onMounted(() => {
                   </label>
                 </div>
                 <div class="field-group full">
-                  <label>教师信息</label>
+                  <label>关联教师（从现有教师中选择）</label>
                   <div class="course-teacher-row">
                     <div class="image-upload">
-                      <label class="upload-label">头像</label>
+                      <label class="upload-label">教师头像（可覆盖默认）</label>
                       <input type="file" accept="image/*" @change="handleCourseAvatarUpload($event, editingCourse)" :disabled="uploadLoading" />
                       <img v-if="editingCourse.teacher_avatar" :src="getImageUrl(editingCourse.teacher_avatar)" class="preview-img avatar-preview" />
                     </div>
                     <div class="teacher-fields-inline">
-                      <input v-model="editingCourse.teacher_name" placeholder="教师姓名 (中)" />
-                      <input v-model="editingCourse.teacher_name_en" placeholder="Teacher Name (En)" />
-                      <input v-model="editingCourse.teacher_title" placeholder="职称 (中)" />
-                      <input v-model="editingCourse.teacher_title_en" placeholder="Title (En)" />
+                      <select v-model="editingCourse._teacherId" class="teacher-select" @change="applyTeacherFromList(editingCourse)">
+                        <option value="">-- 选择已有教师 --</option>
+                        <option v-for="t in teachers" :key="t.id" :value="t.id">
+                          {{ t.name }}{{ t.name_en ? ' / ' + t.name_en : '' }}{{ t.title ? ' — ' + t.title : '' }}
+                        </option>
+                      </select>
+                      <input v-model="editingCourse.teacher_name" placeholder="教师姓名 (中) - 自动填充" readonly />
+                      <input v-model="editingCourse.teacher_name_en" placeholder="Teacher Name (En) - 自动填充" readonly />
+                      <input v-model="editingCourse.teacher_title" placeholder="职称 (中) - 自动填充" readonly />
+                      <input v-model="editingCourse.teacher_title_en" placeholder="Title (En) - 自动填充" readonly />
                     </div>
                   </div>
                 </div>
@@ -1268,6 +1295,16 @@ onMounted(() => {
 .course-teacher-row { display: flex; gap: 1rem; align-items: flex-start; }
 .teacher-fields-inline { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; flex: 1; }
 .teacher-fields-inline input { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+.teacher-fields-inline input[readonly] { background: #f7f7f7; color: #666; cursor: not-allowed; }
+.teacher-select {
+  grid-column: 1 / -1;
+  padding: 0.6rem;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background: #f0f9ff;
+  margin-bottom: 0.25rem;
+}
 .upload-label { font-size: 0.85rem; color: #666; display: block; margin-bottom: 0.25rem; }
 .preview-img.avatar-preview { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
 .feature-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; }
