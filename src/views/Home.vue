@@ -101,6 +101,20 @@ const getParagraphs = (text: string) => {
   return renderMarkdown(text);
 };
 
+const getBannerImage = (banner: Banner) => {
+  if (currentLang.value === 'en') {
+    return banner.image_url_en || banner.image_url;
+  }
+  return banner.image_url || banner.image_url_en;
+};
+
+const getBannerTitle = (banner: Banner) => {
+  if (currentLang.value === 'en') {
+    return banner.title_en || banner.title;
+  }
+  return banner.title || banner.title_en;
+};
+
 onMounted(() => {
   loadData();
   window.addEventListener('scroll', updateNavVisibility);
@@ -189,8 +203,8 @@ const siteTitle = computed(() => {
             <img
               v-for="(banner, index) in banners"
               :key="banner.id"
-              :src="getImageUrl(currentLang === 'en' && banner.image_url_en ? banner.image_url_en : banner.image_url)"
-              :alt="currentLang === 'en' && banner.title_en ? banner.title_en : banner.title"
+              :src="getImageUrl(getBannerImage(banner))"
+              :alt="getBannerTitle(banner)"
               :class="['banner-img', { active: index === currentBannerIndex }]"
               draggable="false"
             />
