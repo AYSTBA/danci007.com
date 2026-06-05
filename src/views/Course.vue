@@ -301,6 +301,12 @@ onMounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- 页脚 -->
+        <footer class="page-footer">
+          <p>© {{ new Date().getFullYear() }} {{ t('中萱文化', 'Zhongxuan Culture') }}</p>
+          <a v-if="isZh" class="icp-link" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
+        </footer>
       </div>
     </template>
 
@@ -1026,6 +1032,21 @@ onMounted(() => {
 }
 .enter-btn:active { opacity: 0.9; }
 .safe-bottom { height: 20px; }
+
+/* ── 课程列表页脚 ── */
+.page-footer {
+  text-align: center;
+  padding: 24px 16px 16px;
+  color: var(--text-light);
+  font-size: 12px;
+}
+.page-footer p { margin: 0 0 4px; }
+.page-footer .icp-link {
+  color: var(--text-light);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.page-footer .icp-link:hover { color: var(--primary-color); }
 
 /* ── 复制提示 ── */
 .copy-tip {

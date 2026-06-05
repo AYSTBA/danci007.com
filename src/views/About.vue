@@ -213,6 +213,7 @@ onUnmounted(stopBannerAutoPlay)
     <footer class="about-footer">
       <span>{{ siteName }}</span>
       <span class="footer-note">{{ siteNote }}</span>
+      <a class="icp-link" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
     </footer>
 
   </div>
@@ -515,6 +516,14 @@ onUnmounted(stopBannerAutoPlay)
   font-size: 11px;
   color: #bbb;
 }
+
+.icp-link {
+  font-size: 11px;
+  color: #bbb;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.icp-link:hover { color: var(--primary-color); }
 
 /* ── PC 适配 ── */
 @media (min-width: 768px) {

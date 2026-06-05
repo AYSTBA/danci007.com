@@ -318,6 +318,7 @@ const siteTitle = computed(() => {
       <div class="footer-bottom">
         <span class="footer-note">{{ currentLang === 'zh' ? (pageContents.site_note || '中萱百日学通文化的简称') : (pageContents.site_note_en || 'Abbreviation for Zhongxuan Bairixuetong Culture') }}</span>
         <span class="footer-copy">&copy; {{ new Date().getFullYear() }} {{ pageContents.site_name || '中萱文化' }}. All rights reserved.</span>
+        <a v-if="currentLang === 'zh'" class="footer-icp" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
       </div>
     </footer>
 
@@ -936,6 +937,16 @@ const siteTitle = computed(() => {
 .footer-copy {
   font-size: 0.72rem;
   color: var(--text-light);
+}
+
+.footer-icp {
+  font-size: 0.72rem;
+  color: var(--text-light);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-icp:hover {
+  color: var(--primary-color);
 }
 
 /* ── 移动端底部 Tab Bar ── */

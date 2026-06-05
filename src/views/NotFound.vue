@@ -52,6 +52,7 @@ const links = [
 
       <!-- Copyright -->
       <p class="copyright">&copy; {{ new Date().getFullYear() }} 中萱文化 · 中萱书店</p>
+      <a class="icp-link" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
     </div>
   </div>
 </template>
@@ -199,6 +200,16 @@ const links = [
   font-size: 12px;
   color: var(--text-light);
 }
+
+.icp-link {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-light);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.icp-link:hover { color: var(--primary-color); }
 
 @media (max-width: 768px) {
   .error-code { font-size: 64px; }

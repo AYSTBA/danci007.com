@@ -343,6 +343,7 @@ onUnmounted(() => {
     <!-- 底部 -->
     <footer class="page-footer">
       <p>&copy; 2024 {{ currentLang === 'zh' ? '中萱文化' : 'Zhongxuan Culture' }} {{ currentLang === 'zh' ? '龙岗教学点' : 'Longgang Center' }}</p>
+      <a v-if="currentLang === 'zh'" class="icp-link" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
     </footer>
 
     <!-- 微信二维码弹窗 -->
@@ -861,6 +862,16 @@ select.input {
   margin: 0;
   font-weight: 500;
 }
+
+.page-footer .icp-link {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.page-footer .icp-link:hover { color: white; text-decoration: underline; }
 
 /* ── 微信弹窗 ── */
 .modal-overlay {
