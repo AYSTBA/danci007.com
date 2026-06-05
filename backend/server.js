@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
 import Database from 'better-sqlite3';
 import sharp from 'sharp';
 import 'dotenv/config';
@@ -485,7 +485,7 @@ app.get('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
     const referenced = collectReferencedUploadPaths();
     const orphans = files.filter(f => !referenced.has(f));
     const totalSize = orphans.reduce((sum, f) => {
-      try { return sum + require('fs').statSync(path.join(uploadDir, f)).size; } catch { return sum; }
+      try { return sum + statSync(path.join(uploadDir, f)).size; } catch { return sum; }
     }, 0);
     res.json({ orphans, count: orphans.length, totalSize });
   } catch (e) {
@@ -507,7 +507,7 @@ app.post('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
     if (olderThanHours > 0) {
       const cutoff = Date.now() - olderThanHours * 3600 * 1000;
       toDelete = toDelete.filter(f => {
-        try { return require('fs').statSync(path.join(uploadDir, f)).mtimeMs < cutoff; } catch { return false; }
+        try { return statSync(path.join(uploadDir, f)).mtimeMs < cutoff; } catch { return false; }
       });
     }
     let deleted = 0;
@@ -689,7 +689,7 @@ if (process.argv.includes('--cleanup')) {
       if (referenced.has(f)) continue;
       const full = path.join(uploadDir, f);
       try {
-        const st = require('fs').statSync(full);
+        const st = statSync(full);
         if (st.mtimeMs >= cutoff) continue;
         unlinkSync(full);
         deleted++;
