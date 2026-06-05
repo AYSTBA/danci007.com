@@ -47,7 +47,7 @@ const saveWechatQR = () => {
 };
 
 const form = ref({
-  name: '', age: '', phone: '', email: ''
+  name: '', age: '', phone: '', email: '', date: '', time: '', message: ''
 });
 const isSubmitted = ref(false);
 
@@ -109,8 +109,8 @@ const goBack = () => {
 };
 
 const handleSubmit = async () => {
-  if (!form.value.name || !form.value.age || !form.value.phone) {
-    alert(currentLang.value === 'zh' ? '请填写姓名/年龄/电话' : 'Please fill name/age/phone');
+  if (!form.value.name || !form.value.age || !form.value.phone || !form.value.date || !form.value.time) {
+    alert(currentLang.value === 'zh' ? '请填写所有必填字段（姓名/年龄/电话/日期/时间）' : 'Please fill all required fields');
     return;
   }
   try {
@@ -122,6 +122,9 @@ const handleSubmit = async () => {
         age: form.value.age.trim(),
         phone: form.value.phone.trim(),
         email: (form.value.email || '').trim(),
+        date: form.value.date,
+        time: form.value.time,
+        message: (form.value.message || '').trim(),
         course: lockedCourseId.value || '',
         course_name: lockedCourse.value ? lockedCourseName.value : ''
       })
@@ -137,10 +140,13 @@ const labels = computed(() => ({
   age: currentLang.value === 'zh' ? '年龄' : 'Age',
   phone: currentLang.value === 'zh' ? '联系电话' : 'Phone',
   email: currentLang.value === 'zh' ? '邮箱' : 'Email',
+  date: currentLang.value === 'zh' ? '预约日期' : 'Date',
+  time: currentLang.value === 'zh' ? '预约时间' : 'Time',
   courseLabel: currentLang.value === 'zh' ? '您要预约的课程' : 'Course',
-  courseHint: currentLang.value === 'zh' ? '由课程页面带入，不可修改' : 'Brought from course page, locked',
   pleaseSelect: currentLang.value === 'zh' ? '-- 选择' : '-- Select',
   submit: currentLang.value === 'zh' ? '提交预约' : 'Submit Booking',
+  message: currentLang.value === 'zh' ? '留言（选填）' : 'Message (Optional)',
+  placeholderMessage: currentLang.value === 'zh' ? '告诉我们您的需求...' : 'Tell us your needs...',
   successTitle: currentLang.value === 'zh' ? '预约成功！' : 'Booking Successful!',
   successDesc: currentLang.value === 'zh' ? '我们会尽快与您联系，请保持电话畅通。' : 'We will contact you soon, please keep your phone available.',
   placeholderName: currentLang.value === 'zh' ? '请输入您的姓名' : 'Enter your name',
@@ -156,6 +162,29 @@ onMounted(() => {
   document.addEventListener('click', handleGlobalClick);
   window.addEventListener('scroll', updateNavVisibility);
 });
+
+const weekdayTimeOptions = [
+  { value: '17:00-18:00', zh: '17:00-18:00', en: '17:00-18:00' },
+  { value: '18:00-19:00', zh: '18:00-19:00', en: '18:00-19:00' },
+  { value: '19:00-20:00', zh: '19:00-20:00', en: '19:00-20:00' },
+  { value: '20:00-21:00', zh: '20:00-21:00', en: '20:00-21:00' }
+];
+
+const weekendTimeOptions = [
+  { value: '9:00-10:30', zh: '9:00-10:30', en: '9:00-10:30' },
+  { value: '10:30-12:00', zh: '10:30-12:00', en: '10:30-12:00' },
+  { value: '14:00-15:30', zh: '14:00-15:30', en: '14:00-15:30' },
+  { value: '15:30-17:00', zh: '15:30-17:00', en: '15:30-17:00' },
+  { value: '17:30-18:30', zh: '17:30-18:30', en: '17:30-18:30' }
+];
+
+const timeOptions = computed(() => {
+  if (!form.value.date) return [];
+  const dayOfWeek = new Date(form.value.date).getDay();
+  return (dayOfWeek === 0 || dayOfWeek === 6) ? weekendTimeOptions : weekdayTimeOptions;
+});
+
+watch(() => form.value.date, () => { form.value.time = ''; });
 
 onUnmounted(() => {
   if (rotatingInterval.value) clearInterval(rotatingInterval.value);
@@ -241,12 +270,11 @@ onUnmounted(() => {
           <div v-if="lockedCourse" class="locked-course-box">
             <div class="locked-course-label">{{ labels.courseLabel }}</div>
             <div class="locked-course-name">{{ lockedCourseName }}</div>
-            <div class="locked-course-hint">🔒 {{ labels.courseHint }}</div>
           </div>
           <div v-else class="locked-course-box empty">
             <div class="locked-course-label">{{ labels.courseLabel }}</div>
             <div class="locked-course-name locked-course-name-muted">
-              {{ currentLang === 'zh' ? '未指定课程（从课程页进入可锁定具体课程）' : 'No course selected' }}
+              {{ currentLang === 'zh' ? '未指定课程' : 'No course selected' }}
             </div>
           </div>
           <div class="field">
@@ -264,6 +292,23 @@ onUnmounted(() => {
           <div class="field">
             <label>{{ labels.email }}</label>
             <input v-model="form.email" type="email" :placeholder="labels.placeholderEmail" class="input" />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>{{ labels.date }} <span class="req">*</span></label>
+              <input v-model="form.date" type="date" class="input" />
+            </div>
+            <div class="field">
+              <label>{{ labels.time }} <span class="req">*</span></label>
+              <select v-model="form.time" class="input">
+                <option value="">{{ labels.pleaseSelect }}</option>
+                <option v-for="opt in timeOptions" :key="opt.value" :value="opt.value">{{ currentLang === 'zh' ? opt.zh : opt.en }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ labels.message }}</label>
+            <textarea v-model="form.message" :placeholder="labels.placeholderMessage" class="input textarea" rows="3"></textarea>
           </div>
           <button type="submit" class="submit-btn">{{ labels.submit }}</button>
         </form>
@@ -696,7 +741,6 @@ select.input {
   word-break: break-all;
 }
 .locked-course-name-muted { color: #aaa; font-weight: 400; font-size: 14px; }
-.locked-course-hint { font-size: 12px; color: #999; margin-top: 4px; }
 
 /* ── 成功 ── */
 .success-card {
