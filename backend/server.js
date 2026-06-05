@@ -40,7 +40,7 @@ app.use(express.json({ limit: '5mb' }));
 // ── 登录频率限制 ──
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: isDev ? 1000 : 10,
   message: { error: '登录尝试过于频繁，请15分钟后再试' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -55,11 +55,11 @@ function generateAdminToken() {
     exp: Date.now() + 24 * 60 * 60 * 1000,
     id: crypto.randomBytes(16).toString('hex'),
   });
+  const encodedPayload = Buffer.from(payload).toString('base64url');
   const hmac = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET);
-  hmac.update(payload);
+  hmac.update(encodedPayload);
   const signature = hmac.digest('base64url');
-  const token = Buffer.from(payload).toString('base64url') + '.' + signature;
-  return token;
+  return encodedPayload + '.' + signature;
 }
 
 function verifyAdminToken(token) {
