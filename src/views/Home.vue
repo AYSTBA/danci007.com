@@ -66,9 +66,6 @@ const onTouchEnd = (e: TouchEvent) => {
 };
 
 // ── 滚动 ──
-const sections = ['hero', 'why', 'teachers', 'gallery'];
-const activeBallIndex = ref(-1); // 默认不激活
-const rotation = ref(0); // 初始位置
 const lastScrollY = ref(0);
 const isNavVisible = ref(true);
 const showMobileMenu = ref(false);
@@ -106,16 +103,16 @@ const getParagraphs = (text: string) => {
 
 onMounted(() => {
   loadData();
-  window.addEventListener('scroll', updateCurrentSection);
-  updateCurrentSection();
+  window.addEventListener('scroll', updateNavVisibility);
+  updateNavVisibility();
 });
 
 onUnmounted(() => {
-  window.removeEventListener('scroll', updateCurrentSection);
+  window.removeEventListener('scroll', updateNavVisibility);
   stopAutoPlay();
 });
 
-const updateCurrentSection = () => {
+const updateNavVisibility = () => {
   const scrollY = window.scrollY;
 
   if (scrollY > lastScrollY.value && scrollY > 100) {
@@ -124,68 +121,6 @@ const updateCurrentSection = () => {
     isNavVisible.value = true;
   }
   lastScrollY.value = scrollY;
-
-  // 计算各个区域的位置
-  const sectionPositions = [];
-
-  for (let i = 0; i < sections.length; i++) {
-    const section = document.getElementById(sections[i]);
-    if (section) {
-      const rect = section.getBoundingClientRect();
-      const sectionTop = scrollY + rect.top;
-      const sectionHeight = rect.height;
-      const sectionMiddle = sectionTop + sectionHeight / 2;
-      sectionPositions.push({
-        index: i,
-        top: sectionTop,
-        middle: sectionMiddle,
-        height: sectionHeight
-      });
-    }
-  }
-
-  const viewportCenter = scrollY + window.innerHeight / 2;
-
-  // 球的初始位置（容器不旋转时）：
-  // 0号球（hero）：rotate(90deg) → 右边
-  // 1号球（why）：rotate(180deg) → 下边
-  // 2号球（teachers）：rotate(270deg) → 左边
-  // 3号球（gallery）：rotate(0deg) → 上边
-  
-  // 我们希望：
-  // hero中间 → 0号在右 → 容器旋转0°
-  // why中间 → 1号在右 → 容器逆时针旋转90°（-90°）
-  // teachers中间 → 2号在右 → 容器旋转-180°
-  // gallery中间 → 3号在右 → 容器旋转-270°
-  
-  if (sectionPositions.length >= 2) {
-    const firstMiddle = sectionPositions[0].middle;
-    const lastMiddle = sectionPositions[sectionPositions.length - 1].middle;
-    const totalScrollDistance = lastMiddle - firstMiddle;
-    
-    let progress = 0;
-    if (totalScrollDistance > 0) {
-      progress = Math.max(0, Math.min(1, (viewportCenter - firstMiddle) / totalScrollDistance));
-    }
-    
-    // 顺时针旋转（正值），每个区域对应90度
-    rotation.value = progress * 360;
-    
-    // 激活球的逻辑：找到当前视口中心已经经过了几个中间点
-    let activeIndex = 0; // 默认激活第一个球
-    
-    for (let i = sectionPositions.length - 1; i >= 0; i--) {
-      if (viewportCenter >= sectionPositions[i].middle - 10) { // 减10是为了提前一点点切换
-        activeIndex = i;
-        break;
-      }
-    }
-    
-    activeBallIndex.value = activeIndex;
-  } else {
-    rotation.value = 0;
-    activeBallIndex.value = 0;
-  }
 };
 
 const siteTitle = computed(() => {
@@ -245,23 +180,6 @@ const siteTitle = computed(() => {
         <a href="/booking" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '预约与联系' : 'Booking & Contact' }}</a>
       </div>
     </header>
-
-    <!-- 左侧圆圈装饰 -->
-    <div class="circle-container" :style="{ transform: `translateY(-50%) rotate(${rotation}deg)` }">
-      <div class="circle-track"></div>
-      <!-- 0号球 - hero: 右边 (3点钟) -->
-      <div :class="['circle-dot', { active: activeBallIndex === 0, 'active-brand': activeBallIndex === 0 }]"
-        style="transform: rotate(90deg) translateY(-140px)"></div>
-      <!-- 1号球 - why: 下边 (6点钟) -->
-      <div :class="['circle-dot', { active: activeBallIndex === 1, 'active-brand': activeBallIndex === 1 }]"
-        style="transform: rotate(180deg) translateY(-140px)"></div>
-      <!-- 2号球 - teachers: 左边 (9点钟) -->
-      <div :class="['circle-dot', { active: activeBallIndex === 2, 'active-brand': activeBallIndex === 2 }]"
-        style="transform: rotate(270deg) translateY(-140px)"></div>
-      <!-- 3号球 - gallery: 上边 (12点钟) -->
-      <div :class="['circle-dot', { active: activeBallIndex === 3, 'active-brand': activeBallIndex === 3 }]"
-        style="transform: rotate(0deg) translateY(-140px)"></div>
-    </div>
 
     <!-- Banner 轮播 -->
     <section id="hero" class="hero-section">
@@ -585,84 +503,6 @@ const siteTitle = computed(() => {
   border-bottom: none;
 }
 
-/* ── 左侧圆圈装饰 ── */
-.circle-container {
-  position: fixed;
-  left: -150px;
-  top: 50%;
-  transform: translateY(-50%) rotate(0deg);
-  z-index: 50;
-  width: 350px;
-  height: 350px;
-  transition: transform 0.1s ease-out;
-}
-
-.circle-track {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%,-50%);
-  width: 280px;
-  height: 280px;
-  border: 2px solid #e0e0e0;
-  border-radius: 50%;
-}
-
-.circle-dot {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 16px; height: 16px;
-  background: #bbb;
-  border-radius: 50%;
-  margin-left: -8px; margin-top: -8px;
-  transition: all 0.4s cubic-bezier(0.25,0.8,0.25,1);
-}
-
-.circle-dot.active {
-  background: #1a1a1a;
-  box-shadow: 0 0 0 6px rgba(26,26,26,0.1);
-  width: 18px; height: 18px;
-  margin-left: -9px; margin-top: -9px;
-}
-
-.circle-dot.active-brand {
-  background: #3498db;
-  box-shadow: 0 0 0 6px rgba(52, 152, 219, 0.15);
-}
-
-/* ── 左侧导航球 (备用) ── */
-.nav-dots {
-  position: fixed;
-  left: 30px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  display: none;
-}
-
-.nav-dot {
-  width: 12px;
-  height: 12px;
-  background: #bbb;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.nav-dot:hover {
-  background: #888;
-  transform: scale(1.2);
-}
-
-.nav-dot.active {
-  background: var(--primary-color);
-  box-shadow: 0 0 0 6px rgba(67, 160, 71, 0.15);
-  width: 14px;
-  height: 14px;
-}
-
 /* ── Banner 轮播 ── */
 .hero-section {
   min-height: 100vh;
@@ -676,14 +516,14 @@ const siteTitle = computed(() => {
 .hero-inner {
   width: 100%;
   display: flex;
-  justify-content: flex-end;
-  padding: 0 45px 0 130px;
+  justify-content: center;
+  padding: 0 45px;
 }
 
 .hero-banner-wrapper {
   position: relative;
-  width: 90%;
-  max-width: 1450px;
+  width: 100%;
+  max-width: 1600px;
 }
 
 .hero-banner {
@@ -773,16 +613,16 @@ const siteTitle = computed(() => {
   display: flex;
   align-items: center;
   width: 100%;
-  justify-content: flex-end;
-  padding: 80px 45px 80px 130px;
+  justify-content: center;
+  padding: 80px 45px;
   background: transparent;
   position: relative;
   z-index: 1;
 }
 
 .why-inner {
-  width: 90%;
-  max-width: 1450px;
+  width: 100%;
+  max-width: 1600px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -863,16 +703,16 @@ const siteTitle = computed(() => {
   display: flex;
   align-items: center;
   width: 100%;
-  justify-content: flex-end;
-  padding: 0 45px 0 130px;
+  justify-content: center;
+  padding: 0 45px;
   background: transparent;
   position: relative;
   z-index: 1;
 }
 
 .teachers-inner {
-  width: 90%;
-  max-width: 1450px;
+  width: 100%;
+  max-width: 1600px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1112,18 +952,8 @@ const siteTitle = computed(() => {
    移动端 App 模式 ≤768px
    ══════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* 隐藏轨迹球（手机端不需要）*/
-  .circle-container {
-    display: none !important;
-  }
-
   .page-container {
     padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 8px);
-  }
-
-  .nav-dots,
-  .pendant-container {
-    display: none;
   }
 
   .header-inner {
