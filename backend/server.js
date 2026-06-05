@@ -13,15 +13,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 80;
+const isDev = process.env.NODE_ENV !== 'production';
 
-// ── 安全校验 ──
-
-if (!process.env.ADMIN_PASSWORD) {
-  console.error('FATAL: 环境变量 ADMIN_PASSWORD 未设置，请设置后再启动');
+// ── 管理员密码 ──
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isDev ? 'admin' : null);
+if (!ADMIN_PASSWORD) {
+  console.error('FATAL: 生产环境必须设置 ADMIN_PASSWORD 环境变量');
   process.exit(1);
 }
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!process.env.ADMIN_PASSWORD) {
+  console.warn('⚠ 使用默认密码 admin（仅限本地开发，生产环境请设置 ADMIN_PASSWORD）');
+}
 
 const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
 
@@ -601,6 +604,8 @@ if (existsSync(distDir) && existsSync(indexPath)) {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-  console.log('Database initialized at:', dbPath);
+  console.log(`\n  ✅ 单词突击007 已启动`);
+  console.log(`  📍 访问地址: http://localhost:${PORT}`);
+  console.log(`  🔧 后台管理: http://localhost:${PORT}/admin`);
+  console.log(`  📦 数据路径: ${dbPath}\n`);
 });
