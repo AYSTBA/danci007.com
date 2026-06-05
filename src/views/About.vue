@@ -6,7 +6,6 @@ import { normalizeActive } from '../types'
 import { useLanguage } from '../composables/useLanguage'
 import { useBannerCarousel } from '../composables/useBannerCarousel'
 import { getImageUrl, goBack, fetchJson } from '../utils'
-import MobileTabBar from '../components/MobileTabBar.vue'
 
 const router = useRouter()
 const { currentLang } = useLanguage()
@@ -216,8 +215,6 @@ onUnmounted(stopBannerAutoPlay)
       <span class="footer-note">{{ siteNote }}</span>
     </footer>
 
-    <!-- 移动端底部导航栏 -->
-    <MobileTabBar />
   </div>
 </template>
 

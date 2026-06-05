@@ -5,9 +5,7 @@ import type { Banner, PageContents, Teacher } from '../types';
 import { normalizeActive } from '../types';
 import { useLanguage } from '../composables/useLanguage';
 import { useBannerCarousel } from '../composables/useBannerCarousel';
-import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml } from '../utils';
-import { fetchJson } from '../utils';
-import MobileTabBar from '../components/MobileTabBar.vue'
+import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml, fetchJson } from '../utils';
 
 const router = useRouter();
 
@@ -360,8 +358,6 @@ const siteTitle = computed(() => {
       </div>
     </footer>
 
-    <!-- 移动端底部导航栏 -->
-    <MobileTabBar />
   </div>
 </template>
 

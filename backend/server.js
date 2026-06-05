@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,49 +13,89 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 80;
+const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+// ── 安全校验 ──
+
+if (!process.env.ADMIN_PASSWORD) {
+  console.error('FATAL: 环境变量 ADMIN_PASSWORD 未设置，请设置后再启动');
+  process.exit(1);
+}
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
+
+// ── CORS ──
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+const corsOptions = corsOrigin === '*'
+  ? { origin: true }
+  : { origin: corsOrigin.split(',').map(s => s.trim()) };
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: '5mb' }));
+
+// ── 登录频率限制 ──
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: '登录尝试过于频繁，请15分钟后再试' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── Admin 鉴权 ──
+const activeTokens = new Map();
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '888888';
-const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || 'danci007-admin-secret-' + Date.now();
-const activeTokens = new Set();
-
-/** 生成简易 token（生产环境应使用 JWT） */
 function generateAdminToken() {
-  const raw = ADMIN_TOKEN_SECRET + '-' + Math.random().toString(36).slice(2) + '-' + Date.now();
-  return Buffer.from(raw).toString('base64url');
+  const payload = JSON.stringify({
+    iat: Date.now(),
+    exp: Date.now() + 24 * 60 * 60 * 1000,
+    id: crypto.randomBytes(16).toString('hex'),
+  });
+  const hmac = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET);
+  hmac.update(payload);
+  const signature = hmac.digest('base64url');
+  const token = Buffer.from(payload).toString('base64url') + '.' + signature;
+  return token;
 }
 
-/** Admin API 鉴权中间件 */
+function verifyAdminToken(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 2) return null;
+    const [encodedPayload, signature] = parts;
+    const hmac = crypto.createHmac('sha256', ADMIN_TOKEN_SECRET);
+    hmac.update(encodedPayload);
+    const expectedSig = hmac.digest('base64url');
+    if (signature !== expectedSig) return null;
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString());
+    if (payload.exp <= Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 function requireAdminAuth(req, res, next) {
   const token = req.headers['x-admin-token'];
-  if (!token || !activeTokens.has(token)) {
+  if (!token || !verifyAdminToken(token)) {
     return res.status(401).json({ error: '未授权，请先登录' });
   }
   next();
 }
 
 // POST /api/admin/login — 管理员登录
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', loginLimiter, (req, res) => {
   const { password } = req.body;
   if (!password || password !== ADMIN_PASSWORD) {
     return res.status(403).json({ error: '密码错误' });
   }
   const token = generateAdminToken();
-  activeTokens.add(token);
-  // 24 小时后自动过期
-  setTimeout(() => activeTokens.delete(token), 24 * 60 * 60 * 1000);
   res.json({ success: true, token });
 });
 
 // POST /api/admin/logout — 管理员登出
 app.post('/api/admin/logout', (req, res) => {
-  const token = req.headers['x-admin-token'];
-  if (token) activeTokens.delete(token);
   res.json({ success: true });
 });
 
@@ -76,7 +118,7 @@ for (const dir of [uploadDir, dataDir]) {
 app.use('/uploads', express.static(uploadDir));
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage: storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const dbPath = path.join(dataDir, 'danci007.db');
 const db = new Database(dbPath);
@@ -263,13 +305,11 @@ app.get('/api/admin/banners', requireAdminAuth, (req, res) => {
 app.post('/api/banners', requireAdminAuth, (req, res) => {
   try {
     const { title, title_en, image_url, image_url_en, link, active, sort_order } = req.body;
-    console.log('Creating banner:', { title, title_en, image_url, image_url_en, link, active, sort_order });
     const result = db.prepare(`
       INSERT INTO banners (title, title_en, image_url, image_url_en, link, active, sort_order)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(title || '', title_en || '', image_url || '', image_url_en || '', link || '', active !== undefined ? active : 1, sort_order || 0);
     
-    console.log('Banner created with id:', result.lastInsertRowid);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating banner:', error);
@@ -281,7 +321,6 @@ app.put('/api/banners/:id', requireAdminAuth, (req, res) => {
   try {
     const id = Number(req.params.id);
     const { title, title_en, image_url, image_url_en, link, active, sort_order } = req.body;
-    console.log('Updating banner id:', id, { title, title_en, image_url, image_url_en, link, active, sort_order });
     
     db.prepare(`
       UPDATE banners 
@@ -296,7 +335,6 @@ app.put('/api/banners/:id', requireAdminAuth, (req, res) => {
       WHERE id = ?
     `).run(title, title_en, image_url, image_url_en, link, active, sort_order, id);
     
-    console.log('Banner updated successfully');
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -318,13 +356,11 @@ app.get('/api/teachers', (req, res) => {
 app.post('/api/teachers', requireAdminAuth, (req, res) => {
   try {
     const { name, name_en, title, title_en, description, description_en, avatar, active, sort_order } = req.body;
-    console.log('Creating teacher:', { name, name_en, title, title_en, description, description_en, avatar, active, sort_order });
     const result = db.prepare(`
       INSERT INTO teachers (name, name_en, title, title_en, description, description_en, avatar, active, sort_order)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(name || '', name_en || '', title || '', title_en || '', description || '', description_en || '', avatar || '', active !== undefined ? active : 1, sort_order || 0);
     
-    console.log('Teacher created with id:', result.lastInsertRowid);
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating teacher:', error);
@@ -336,7 +372,6 @@ app.put('/api/teachers/:id', requireAdminAuth, (req, res) => {
   try {
     const id = Number(req.params.id);
     const { name, name_en, title, title_en, description, description_en, avatar, active, sort_order } = req.body;
-    console.log('Updating teacher id:', id, { name, name_en, title, title_en, description, description_en, avatar, active, sort_order });
     
     db.prepare(`
       UPDATE teachers 
@@ -353,7 +388,6 @@ app.put('/api/teachers/:id', requireAdminAuth, (req, res) => {
       WHERE id = ?
     `).run(name, name_en, title, title_en, description, description_en, avatar, active, sort_order, id);
     
-    console.log('Teacher updated successfully');
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating teacher:', error);
@@ -374,10 +408,16 @@ app.get('/api/bookings', requireAdminAuth, (req, res) => {
 
 app.post('/api/bookings', (req, res) => {
   const { name, phone, email, date, time, course } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: '姓名和电话不能为空' });
+  }
+  if (name.length > 50 || phone.length > 30) {
+    return res.status(400).json({ error: '姓名或电话过长' });
+  }
   const result = db.prepare(`
     INSERT INTO bookings (name, phone, email, date, time, course)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name || '', phone || '', email || '', date || '', time || '', course || '');
+  `).run(name.trim(), phone.trim(), (email || '').trim(), date || '', time || '', course || '');
   
   res.json({ success: true, id: result.lastInsertRowid });
 });
@@ -442,7 +482,7 @@ app.get('/api/admin/courses', requireAdminAuth, (req, res) => {
   res.json(courses);
 });
 
-app.post('/api/courses', (req, res) => {
+app.post('/api/courses', requireAdminAuth, (req, res) => {
   try {
     const { course_id, name, name_en, subtitle, subtitle_en, description, description_en, price, original_price, teacher_name, teacher_name_en, teacher_title, teacher_title_en, teacher_avatar, banner_image, features, active } = req.body;
     const result = db.prepare(`
@@ -475,10 +515,16 @@ app.delete('/api/courses/:id', requireAdminAuth, (req, res) => {
 
 app.post('/api/course-enroll', (req, res) => {
   const { course_id, course_name, name, phone } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: '姓名和电话不能为空' });
+  }
+  if (name.length > 50 || phone.length > 30) {
+    return res.status(400).json({ error: '姓名或电话过长' });
+  }
   const result = db.prepare(`
     INSERT INTO course_enrollments (course_id, course_name, name, phone)
     VALUES (?, ?, ?, ?)
-  `).run(course_id || '', course_name || '', name || '', phone || '');
+  `).run(course_id || '', course_name || '', name.trim(), phone.trim());
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
@@ -501,7 +547,10 @@ app.get('/api/courses/:id/reviews', (req, res) => {
 
 app.post('/api/courses/:id/reviews', (req, res) => {
   const { name, rating, content } = req.body;
-  const result = db.prepare('INSERT INTO course_reviews (course_id, name, rating, content) VALUES (?, ?, ?, ?)').run(req.params.id, name || '匿名', rating || 5, content || '');
+  if (content && content.length > 2000) {
+    return res.status(400).json({ error: '评价内容过长' });
+  }
+  const result = db.prepare('INSERT INTO course_reviews (course_id, name, rating, content) VALUES (?, ?, ?, ?)').run(req.params.id, name || '匿名', Math.min(5, Math.max(1, Number(rating) || 5)), (content || '').slice(0, 2000));
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
@@ -510,7 +559,7 @@ app.delete('/api/course-reviews/:id', requireAdminAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/admin/course-reviews', (req, res) => {
+app.get('/api/admin/course-reviews', requireAdminAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM course_reviews ORDER BY created_at DESC').all();
   res.json(rows);
 });
@@ -524,7 +573,10 @@ app.get('/api/courses/:id/interactions', (req, res) => {
 
 app.post('/api/courses/:id/interactions', (req, res) => {
   const { name, content } = req.body;
-  const result = db.prepare('INSERT INTO course_interactions (course_id, name, content) VALUES (?, ?, ?)').run(req.params.id, name || '匿名', content || '');
+  if (!content || content.length > 500) {
+    return res.status(400).json({ error: '互动内容不能为空且不超过500字' });
+  }
+  const result = db.prepare('INSERT INTO course_interactions (course_id, name, content) VALUES (?, ?, ?)').run(req.params.id, name || '匿名', content.slice(0, 500));
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
@@ -533,7 +585,7 @@ app.delete('/api/course-interactions/:id', requireAdminAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/admin/course-interactions', (req, res) => {
+app.get('/api/admin/course-interactions', requireAdminAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM course_interactions ORDER BY created_at DESC').all();
   res.json(rows);
 });

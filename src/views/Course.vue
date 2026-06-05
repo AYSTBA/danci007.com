@@ -3,9 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { Course, CourseReview, CourseInteraction } from '../types';
 import { useLanguage } from '../composables/useLanguage';
-import { getImageUrl, getAvatarUrl, formatDateShort } from '../utils';
-import { fetchJson } from '../utils';
-import MobileTabBar from '../components/MobileTabBar.vue';
+import { getImageUrl, getAvatarUrl, formatDateShort, fetchJson } from '../utils';
 
 const route = useRoute();
 const router = useRouter();

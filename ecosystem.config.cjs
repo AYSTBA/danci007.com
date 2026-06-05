@@ -11,12 +11,10 @@ module.exports = {
       instances: 1,           // SQLite 只支持单实例写入，保持 1
       exec_mode: 'fork',
 
-      // 环境变量
+      // 环境变量（通过 .env 或系统环境变量设置，不要写死在配置文件中）
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001,
-        ADMIN_PASSWORD: 'your_password_here',  // ← 改成你的密码
-        CORS_ORIGIN: 'https://your-domain.com' // ← 改成你的域名
       },
 
       // 日志

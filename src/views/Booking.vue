@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import MobileTabBar from '../components/MobileTabBar.vue';
 
 const router = useRouter();
 const currentLang = ref(localStorage.getItem('language') || 'zh');
@@ -174,7 +173,7 @@ onUnmounted(() => {
           <button class="back-btn" @click="goBack">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
           </button>
-          <span class="logo-text">{{ currentLang === 'zh' ? '中宣英语' : 'Zhongxuan English' }}</span>
+          <span class="logo-text">{{ currentLang === 'zh' ? '中萱文化' : 'Zhongxuan Culture' }}</span>
         </div>
         <div class="header-right">
           <div class="lang-dropdown">
@@ -307,7 +306,7 @@ onUnmounted(() => {
 
     <!-- 底部 -->
     <footer class="page-footer">
-      <p>&copy; 2024 {{ currentLang === 'zh' ? '中宣英语' : 'Zhongxuan English' }} {{ currentLang === 'zh' ? '龙岗教学点' : 'Longgang Center' }}</p>
+      <p>&copy; 2024 {{ currentLang === 'zh' ? '中萱文化' : 'Zhongxuan Culture' }} {{ currentLang === 'zh' ? '龙岗教学点' : 'Longgang Center' }}</p>
     </footer>
 
     <!-- 微信二维码弹窗 -->
@@ -320,8 +319,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 移动端底部导航栏 -->
-    <MobileTabBar />
   </div>
 </template>
 

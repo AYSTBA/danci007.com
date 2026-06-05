@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MobileTabBar from './components/MobileTabBar.vue'
 </script>
 
 <template>
@@ -8,12 +9,21 @@
         <component :is="Component" />
       </transition>
     </router-view>
+    <!-- 移动端底部磨砂玻璃导航栏 -->
+    <MobileTabBar />
   </div>
 </template>
 
 <style scoped>
 .app {
   min-height: 100vh;
+}
+
+/* 移动端底部留出导航栏空间 */
+@media (max-width: 768px) {
+  .app {
+    padding-bottom: 90px;
+  }
 }
 
 .fade-enter-active,

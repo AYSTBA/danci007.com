@@ -23,14 +23,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Admin.vue')
   },
   {
-    path: '/enrollment',
-    name: 'Enrollment',
+    path: '/course',
+    name: 'CourseList',
     component: () => import('../views/Course.vue')
   },
   {
     path: '/course/:id',
-    name: 'Course',
+    name: 'CourseDetail',
     component: () => import('../views/Course.vue')
+  },
+  // 兼容旧链接
+  {
+    path: '/enrollment',
+    redirect: '/course'
   },
   {
     path: '/:pathMatch(.*)*',
