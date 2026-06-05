@@ -17,7 +17,7 @@ cd "$APP_DIR"
 
 # 1. 拉取最新代码（用 main 分支）
 log "==> 拉取最新代码 (origin/main)"
-git fetch origin main
+git fetch --force origin +refs/heads/main:refs/remotes/origin/main
 git reset --hard origin/main
 
 # 2. 保留关键目录
