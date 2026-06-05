@@ -35,6 +35,12 @@ const courseInteractions = ref<any[]>([]);
 const dataLoading = ref(false);
 const dataError = ref<string | null>(null);
 
+// ── 上传遮罩状态 ──
+const uploadLoading = ref(false);
+const uploadProgress = ref(0);
+const uploadFileName = ref('');
+const uploadPhase = ref<'uploading' | 'processing'>('uploading');
+
 const showSaveSuccess = (message: string) => {
   saveMessage.value = message;
   showSaveMessage.value = true;
@@ -198,6 +204,7 @@ const editorAspectRatio = ref<'square' | 'circle' | 'free'>('free');
 const handleTeacherAvatarUpload = (event: Event, teacher: Teacher) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
+  target.value = '';
   if (file) {
     editorAspectRatio.value = 'circle';
     editorFile.value = file;
@@ -212,6 +219,7 @@ const handleTeacherAvatarUpload = (event: Event, teacher: Teacher) => {
 const handleFileUpload = (event: Event, banner: Banner, lang: string) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
+  target.value = '';
   if (file) {
     editorAspectRatio.value = 'free';
     editorFile.value = file;
@@ -229,6 +237,7 @@ const handleFileUpload = (event: Event, banner: Banner, lang: string) => {
 const handleWechatQRUpload = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
+  target.value = '';
   if (file) {
     editorAspectRatio.value = 'square';
     editorFile.value = file;
@@ -341,25 +350,67 @@ const removeBanner = (banner: Banner) => {
   }
 };
 
-const uploadImage = async (file: File) => {
-  try {
+const uploadImage = (file: File): Promise<string | null> => {
+  return new Promise((resolve) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await authFetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
-    if (response.ok) {
-      const result = await response.json();
-      return result.url;
-    } else {
-      alert('上传失败，请重试');
-      return null;
-    }
-  } catch {
-    alert('上传出错，请重试');
-    return null;
-  }
+    const xhr = new XMLHttpRequest();
+    const token = sessionStorage.getItem('adminToken');
+
+    uploadLoading.value = true;
+    uploadProgress.value = 0;
+    uploadFileName.value = file.name;
+    uploadPhase.value = 'uploading';
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        uploadProgress.value = pct;
+        if (pct >= 100) {
+          uploadPhase.value = 'processing';
+        }
+      }
+    };
+
+    xhr.onload = () => {
+      uploadLoading.value = false;
+      if (xhr.status === 401 || xhr.status === 403) {
+        handleLogout();
+        alert('登录已过期，请重新登录');
+        resolve(null);
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const result = JSON.parse(xhr.responseText);
+          resolve(result.url);
+        } catch {
+          alert('上传失败：服务器响应异常');
+          resolve(null);
+        }
+      } else {
+        let msg = '上传失败，请重试';
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+        alert(msg);
+        resolve(null);
+      }
+    };
+
+    xhr.onerror = () => {
+      uploadLoading.value = false;
+      alert('网络错误，上传失败');
+      resolve(null);
+    };
+
+    xhr.onabort = () => {
+      uploadLoading.value = false;
+      resolve(null);
+    };
+
+    xhr.open('POST', '/api/upload');
+    if (token) xhr.setRequestHeader('X-Admin-Token', token);
+    xhr.send(formData);
+  });
 };
 
 const getContent = (key: string): string => pageContents.value[key] || '';
@@ -443,6 +494,21 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- 上传遮罩 (全屏) -->
+      <div v-if="uploadLoading" class="upload-overlay" role="dialog" aria-live="polite">
+        <div class="upload-overlay-card">
+          <div class="upload-overlay-spinner"></div>
+          <div class="upload-overlay-text">
+            {{ uploadPhase === 'processing' ? '服务器处理中…' : '正在上传…' }}
+          </div>
+          <div class="upload-overlay-filename" :title="uploadFileName">{{ uploadFileName }}</div>
+          <div class="upload-overlay-progress">
+            <div class="upload-overlay-progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+          </div>
+          <div class="upload-overlay-percent">{{ uploadProgress }}%</div>
+        </div>
+      </div>
+
       <!-- Loading -->
       <div v-if="dataLoading" class="global-loading" style="min-height:40vh">
         <div class="spinner"></div>
@@ -484,7 +550,7 @@ onMounted(() => {
                   <div class="field-group lang-group">
                     <label>中文图片</label>
                     <div class="image-upload">
-                      <input type="file" @change="handleFileUpload($event, banner, 'zh')" accept="image/*" />
+                      <input type="file" @change="handleFileUpload($event, banner, 'zh')" accept="image/*" :disabled="uploadLoading" />
                       <img v-if="banner.image_url" :src="getImageUrl(banner.image_url)" alt="中文预览" class="preview-img" />
                     </div>
                     <input :value="banner.image_url" @input="banner.image_url = ($event.target as HTMLInputElement).value" placeholder="中文图片URL" />
@@ -492,7 +558,7 @@ onMounted(() => {
                   <div class="field-group lang-group">
                     <label>英文图片</label>
                     <div class="image-upload">
-                      <input type="file" @change="handleFileUpload($event, banner, 'en')" accept="image/*" />
+                      <input type="file" @change="handleFileUpload($event, banner, 'en')" accept="image/*" :disabled="uploadLoading" />
                       <img v-if="banner.image_url_en" :src="getImageUrl(banner.image_url_en)" alt="英文预览" class="preview-img" />
                     </div>
                     <input :value="banner.image_url_en" @input="banner.image_url_en = ($event.target as HTMLInputElement).value" placeholder="English Image URL" />
@@ -571,7 +637,7 @@ onMounted(() => {
                 <div class="content-item-simple">
                   <label>微信二维码</label>
                   <div class="image-upload">
-                    <input type="file" @change="handleWechatQRUpload($event)" accept="image/*" />
+                      <input type="file" @change="handleWechatQRUpload($event)" accept="image/*" :disabled="uploadLoading" />
                     <img v-if="getContent('wechat_qrcode')" :src="getImageUrl(getContent('wechat_qrcode'))" alt="微信二维码" class="preview-img" />
                   </div>
                 </div>
@@ -661,7 +727,7 @@ onMounted(() => {
                   <div class="field-group avatar-group">
                     <label>头像</label>
                     <div class="avatar-upload">
-                      <input type="file" @change="handleTeacherAvatarUpload($event, teacher)" accept="image/*" />
+                      <input type="file" @change="handleTeacherAvatarUpload($event, teacher)" accept="image/*" :disabled="uploadLoading" />
                       <img v-if="teacher.avatar" :src="getImageUrl(teacher.avatar)" alt="教师头像" class="avatar-preview" />
                       <div v-else class="avatar-placeholder">点击上传头像</div>
                     </div>
