@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import MobileTabBar from './components/MobileTabBar.vue'
 
@@ -7,6 +7,28 @@ const route = useRoute()
 const isMobileTabBarVisible = computed(() => {
   return !route.path.startsWith('/course') && !route.path.startsWith('/admin')
 })
+
+// 访客埋点: 路由变化时上报 (sendBeacon 保证页面关闭也能送达)
+function trackVisit(path: string) {
+  try {
+    const payload = JSON.stringify({
+      path,
+      screen_resolution: `${window.screen.width}x${window.screen.height}`,
+      language: navigator.language || '',
+      referer: document.referrer || ''
+    })
+    const blob = new Blob([payload], { type: 'application/json' })
+    // sendBeacon 在不支持时降级到 fetch keepalive
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/visit', blob)
+    } else {
+      fetch('/api/visit', { method: 'POST', body: payload, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {})
+    }
+  } catch { /* 静默失败 */ }
+}
+
+onMounted(() => trackVisit(route.fullPath))
+watch(() => route.fullPath, (p) => trackVisit(p))
 </script>
 
 <template>

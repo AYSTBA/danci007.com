@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
 import Database from 'better-sqlite3';
 import sharp from 'sharp';
+import { UAParser } from 'ua-parser-js';
 import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -101,6 +102,158 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
 // POST /api/admin/logout — 管理员登出
 app.post('/api/admin/logout', (req, res) => {
   res.json({ success: true });
+});
+
+// ── 访客分析 ──
+
+// 提取真实 IP (兼容 nginx proxy)
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return xff.split(',')[0].trim();
+  return req.headers['x-real-ip'] || req.socket.remoteAddress || '';
+}
+
+// IP 地理定位缓存 (24h)
+const geoCache = new Map();
+const GEO_CACHE_TTL = 24 * 60 * 60 * 1000;
+async function lookupGeo(ip) {
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+    return { country: '内网/本地', region: '', city: '' };
+  }
+  const cached = geoCache.get(ip);
+  if (cached && Date.now() - cached.t < GEO_CACHE_TTL) {
+    return cached.data;
+  }
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    const r = await fetch(`http://ip-api.com/json/${ip}?lang=zh-CN&fields=status,country,regionName,city`, { signal: ctrl.signal });
+    clearTimeout(t);
+    const j = await r.json();
+    if (j.status === 'success') {
+      const data = { country: j.country || '', region: j.regionName || '', city: j.city || '' };
+      geoCache.set(ip, { t: Date.now(), data });
+      return data;
+    }
+  } catch { /* 忽略错误 */ }
+  return { country: '', region: '', city: '' };
+}
+
+// POST /api/visit — 前端埋点接口 (公开)
+app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
+  try {
+    const { path: visitPath = '/', screen_resolution = '', language = '', referer = '' } = req.body || {};
+    const ip = getClientIp(req);
+    const ua = req.headers['user-agent'] || '';
+    const parser = new UAParser(ua);
+    const uaResult = parser.getResult();
+    const browser = uaResult.browser;
+    const os = uaResult.os;
+    const device = uaResult.device;
+
+    // 异步解析地理 (不阻塞响应)
+    lookupGeo(ip).then(geo => {
+      try {
+        db.prepare(`
+          INSERT INTO page_visits
+            (path, ip, country, region, city, user_agent, browser, browser_version, os, device_type, device_vendor, device_model, referer, language, screen_resolution)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          String(visitPath).slice(0, 200),
+          ip,
+          geo.country, geo.region, geo.city,
+          ua.slice(0, 500),
+          browser.name || '',
+          browser.version || '',
+          `${os.name || ''} ${os.version || ''}`.trim(),
+          device.type || 'desktop',
+          device.vendor || '',
+          device.model || '',
+          String(referer).slice(0, 500),
+          String(language).slice(0, 50),
+          String(screen_resolution).slice(0, 50)
+        );
+      } catch (e) {
+        console.error('Insert visit failed:', e.message);
+      }
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false });
+  }
+});
+
+// GET /api/admin/visits — 查询访客记录 (后台)
+app.get('/api/admin/visits', requireAdminAuth, (req, res) => {
+  const { limit = 100, offset = 0, ip, browser, os, device, path: vp, since, until } = req.query;
+  const conds = [];
+  const args = [];
+  if (ip) { conds.push('ip LIKE ?'); args.push('%' + ip + '%'); }
+  if (browser) { conds.push('browser LIKE ?'); args.push('%' + browser + '%'); }
+  if (os) { conds.push('os LIKE ?'); args.push('%' + os + '%'); }
+  if (device) { conds.push('device_type = ?'); args.push(device); }
+  if (vp) { conds.push('path LIKE ?'); args.push('%' + vp + '%'); }
+  if (since) { conds.push('visit_time >= ?'); args.push(since); }
+  if (until) { conds.push('visit_time <= ?'); args.push(until); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  const sql = `SELECT * FROM page_visits ${where} ORDER BY visit_time DESC LIMIT ? OFFSET ?`;
+  const rows = db.prepare(sql).all(...args, Math.min(Number(limit) || 100, 1000), Number(offset) || 0);
+  const total = db.prepare(`SELECT COUNT(*) as c FROM page_visits ${where}`).get(...args).c;
+  res.json({ rows, total, limit: Number(limit), offset: Number(offset) });
+});
+
+// GET /api/admin/visits/stats — 统计概览
+app.get('/api/admin/visits/stats', requireAdminAuth, (req, res) => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().replace('T', ' ').slice(0, 19);
+  const weekAgo = new Date(Date.now() - 7 * 86400e3).toISOString().replace('T', ' ').slice(0, 19);
+  const monthAgo = new Date(Date.now() - 30 * 86400e3).toISOString().replace('T', ' ').slice(0, 19);
+
+  const total = db.prepare('SELECT COUNT(*) as c FROM page_visits').get().c;
+  const todayCount = db.prepare('SELECT COUNT(*) as c FROM page_visits WHERE visit_time >= ?').get(todayStr).c;
+  const weekCount = db.prepare('SELECT COUNT(*) as c FROM page_visits WHERE visit_time >= ?').get(weekAgo).c;
+  const monthCount = db.prepare('SELECT COUNT(*) as c FROM page_visits WHERE visit_time >= ?').get(monthAgo).c;
+  const uniqueIps = db.prepare('SELECT COUNT(DISTINCT ip) as c FROM page_visits').get().c;
+  const uniqueToday = db.prepare('SELECT COUNT(DISTINCT ip) as c FROM page_visits WHERE visit_time >= ?').get(todayStr).c;
+
+  const topPaths = db.prepare(`SELECT path, COUNT(*) as c FROM page_visits GROUP BY path ORDER BY c DESC LIMIT 10`).all();
+  const topBrowsers = db.prepare(`SELECT browser as name, COUNT(*) as c FROM page_visits WHERE browser != '' GROUP BY browser ORDER BY c DESC LIMIT 5`).all();
+  const topOs = db.prepare(`SELECT os as name, COUNT(*) as c FROM page_visits WHERE os != '' GROUP BY os ORDER BY c DESC LIMIT 5`).all();
+  const deviceDist = db.prepare(`SELECT device_type as name, COUNT(*) as c FROM page_visits GROUP BY device_type ORDER BY c DESC`).all();
+  const topCountries = db.prepare(`SELECT country, region, city, COUNT(*) as c FROM page_visits WHERE country != '' GROUP BY country, region, city ORDER BY c DESC LIMIT 5`).all();
+  const hourly = db.prepare(`
+    SELECT strftime('%H', visit_time) as hour, COUNT(*) as c
+    FROM page_visits WHERE visit_time >= ?
+    GROUP BY hour ORDER BY hour
+  `).all(todayStr);
+
+  res.json({
+    total, today: todayCount, week: weekCount, month: monthCount,
+    uniqueIps, uniqueToday,
+    topPaths, topBrowsers, topOs, deviceDist, topCountries, hourly
+  });
+});
+
+// DELETE /api/admin/visits — 批量删除访客记录
+app.delete('/api/admin/visits', requireAdminAuth, (req, res) => {
+  const { olderThanDays = 0, all = false } = req.body || {};
+  let deleted = 0;
+  if (all) {
+    const r = db.prepare('DELETE FROM page_visits').run();
+    deleted = r.changes;
+  } else if (Number(olderThanDays) > 0) {
+    const cutoff = new Date(Date.now() - Number(olderThanDays) * 86400e3).toISOString().replace('T', ' ').slice(0, 19);
+    const r = db.prepare('DELETE FROM page_visits WHERE visit_time < ?').run(cutoff);
+    deleted = r.changes;
+  }
+  res.json({ success: true, deleted });
+});
+
+// DELETE /api/admin/visits/:id — 单条删除
+app.delete('/api/admin/visits/:id', requireAdminAuth, (req, res) => {
+  const r = db.prepare('DELETE FROM page_visits WHERE id = ?').run(Number(req.params.id));
+  res.json({ success: true, deleted: r.changes });
 });
 
 // 生产环境：服务 Vite 构建输出的静态文件
@@ -241,6 +394,31 @@ const initDb = () => {
   for (const col of ['age', 'course_name']) {
     try { db.exec(`ALTER TABLE bookings ADD COLUMN ${col} TEXT DEFAULT ''`); } catch { /* 已存在 */ }
   }
+
+  // 页面访问日志 (SEO / 访客分析)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS page_visits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      ip TEXT DEFAULT '',
+      country TEXT DEFAULT '',
+      region TEXT DEFAULT '',
+      city TEXT DEFAULT '',
+      user_agent TEXT DEFAULT '',
+      browser TEXT DEFAULT '',
+      browser_version TEXT DEFAULT '',
+      os TEXT DEFAULT '',
+      device_type TEXT DEFAULT '',
+      device_vendor TEXT DEFAULT '',
+      device_model TEXT DEFAULT '',
+      referer TEXT DEFAULT '',
+      language TEXT DEFAULT '',
+      screen_resolution TEXT DEFAULT '',
+      visit_time DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_visit_time ON page_visits(visit_time DESC);
+    CREATE INDEX IF NOT EXISTS idx_visit_ip ON page_visits(ip);
+  `);
 
   const defaultContents = db.prepare('SELECT COUNT(*) as count FROM page_contents').get().count;
   if (defaultContents === 0) {

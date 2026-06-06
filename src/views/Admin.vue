@@ -50,6 +50,17 @@ let currentUploadXhr: XMLHttpRequest | null = null;
 const orphanInfo = ref<{ orphans: string[]; count: number; totalSize: number } | null>(null);
 const orphanScanning = ref(false);
 
+// ── 访客分析 ──
+const visitStats = ref<any>(null);
+const visitList = ref<any[]>([]);
+const visitTotal = ref(0);
+const visitLoading = ref(false);
+const visitFilter = ref({
+  ip: '', browser: '', os: '', device: '', path: '',
+  since: '', until: '', limit: 50, offset: 0
+});
+const visitHourlyMax = ref(0);
+
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -682,6 +693,73 @@ const handleEditorCancel = () => {
   editorCallback.value = null;
 };
 
+// ── 访客分析 ──
+async function loadVisitStats() {
+  const res = await fetchJson('/api/admin/visits/stats');
+  if (res) visitStats.value = res;
+}
+
+async function loadVisits() {
+  visitLoading.value = true;
+  try {
+    const f = visitFilter.value;
+    const params = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => { if (v !== '' && v !== null && v !== undefined) params.set(k, String(v)); });
+    const res = await fetchJson('/api/admin/visits?' + params.toString());
+    if (res) {
+      visitList.value = res.rows || [];
+      visitTotal.value = res.total || 0;
+    }
+  } finally {
+    visitLoading.value = false;
+  }
+}
+
+function switchTab(name: string) {
+  activeTab.value = name;
+  if (name === 'visits') {
+    loadVisitStats();
+    loadVisits();
+  }
+}
+
+async function deleteVisit(id: number) {
+  if (!confirm('确定删除这条访问记录吗？')) return;
+  const res = await fetchJson('/api/admin/visits/' + id, { method: 'DELETE' });
+  if (res && (res as any).success) {
+    visitList.value = visitList.value.filter(v => v.id !== id);
+    visitTotal.value = Math.max(0, visitTotal.value - 1);
+    loadVisitStats();
+  }
+}
+
+async function cleanupVisits(days: number | 'all') {
+  const msg = days === 'all' ? '确定清空所有访客记录吗？此操作不可恢复！' : `确定删除 ${days} 天前的所有访客记录吗？`;
+  if (!confirm(msg)) return;
+  const body = days === 'all' ? { all: true } : { olderThanDays: days };
+  const res = await fetchJson('/api/admin/visits', { method: 'DELETE', body: JSON.stringify(body) });
+  if (res && (res as any).success) {
+    alert(`已清理 ${(res as any).deleted} 条记录`);
+    loadVisitStats();
+    loadVisits();
+  }
+}
+
+function deviceIcon(type: string) {
+  if (type === 'mobile') return '📱';
+  if (type === 'tablet') return '📲';
+  if (type === 'console' || type === 'smarttv') return '🖥️';
+  return '💻';
+}
+
+function formatVisitTime(t: string) {
+  if (!t) return '';
+  // SQLite 存的是 UTC, 转本地时间显示
+  const d = new Date(t.includes('Z') || t.includes('+') ? t : t.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return t;
+  return d.toLocaleString('zh-CN', { hour12: false });
+}
+
 onMounted(() => {
   checkLogin();
   if (isLoggedIn.value) loadData();
@@ -762,6 +840,7 @@ onMounted(() => {
             <button :class="['tab', { active: activeTab === 'teachers' }]" @click="activeTab = 'teachers'">师资力量管理</button>
             <button :class="['tab', { active: activeTab === 'reviews' }]" @click="activeTab = 'reviews'">课程评价</button>
             <button :class="['tab', { active: activeTab === 'interactions' }]" @click="activeTab = 'interactions'">课程互动</button>
+            <button :class="['tab', { active: activeTab === 'visits' }]" @click="switchTab('visits')">访客分析</button>
           </div>
 
           <!-- Banners Tab -->
@@ -1190,6 +1269,184 @@ onMounted(() => {
               </div>
             </div>
           </div>
+
+          <!-- 访客分析 Tab -->
+          <div v-show="activeTab === 'visits'" class="tab-content">
+            <!-- 统计卡片 -->
+            <div class="visit-stats" v-if="visitStats">
+              <div class="stat-card">
+                <div class="stat-label">总访问量</div>
+                <div class="stat-value">{{ visitStats.total }}</div>
+              </div>
+              <div class="stat-card stat-today">
+                <div class="stat-label">今日访问</div>
+                <div class="stat-value">{{ visitStats.today }}</div>
+                <div class="stat-sub">IP: {{ visitStats.uniqueToday }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">本周访问</div>
+                <div class="stat-value">{{ visitStats.week }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">本月访问</div>
+                <div class="stat-value">{{ visitStats.month }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">独立 IP</div>
+                <div class="stat-value">{{ visitStats.uniqueIps }}</div>
+              </div>
+            </div>
+
+            <!-- 详细分布 -->
+            <div class="visit-distribution" v-if="visitStats">
+              <div class="dist-block">
+                <h4>热门页面 (Top 10)</h4>
+                <div class="dist-list">
+                  <div v-for="p in visitStats.topPaths" :key="p.path" class="dist-row">
+                    <span class="dist-name">{{ p.path }}</span>
+                    <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: Math.min(100, (p.c / (visitStats.topPaths[0]?.c || 1)) * 100) + '%' }"></div></div>
+                    <span class="dist-count">{{ p.c }}</span>
+                  </div>
+                  <div v-if="!visitStats.topPaths.length" class="empty-state"><p>暂无数据</p></div>
+                </div>
+              </div>
+
+              <div class="dist-block">
+                <h4>浏览器分布</h4>
+                <div class="dist-list">
+                  <div v-for="b in visitStats.topBrowsers" :key="b.name" class="dist-row">
+                    <span class="dist-name">{{ b.name }}</span>
+                    <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: Math.min(100, (b.c / (visitStats.topBrowsers[0]?.c || 1)) * 100) + '%' }"></div></div>
+                    <span class="dist-count">{{ b.c }}</span>
+                  </div>
+                  <div v-if="!visitStats.topBrowsers.length" class="empty-state"><p>暂无数据</p></div>
+                </div>
+              </div>
+
+              <div class="dist-block">
+                <h4>操作系统分布</h4>
+                <div class="dist-list">
+                  <div v-for="o in visitStats.topOs" :key="o.name" class="dist-row">
+                    <span class="dist-name">{{ o.name }}</span>
+                    <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: Math.min(100, (o.c / (visitStats.topOs[0]?.c || 1)) * 100) + '%' }"></div></div>
+                    <span class="dist-count">{{ o.c }}</span>
+                  </div>
+                  <div v-if="!visitStats.topOs.length" class="empty-state"><p>暂无数据</p></div>
+                </div>
+              </div>
+
+              <div class="dist-block">
+                <h4>设备类型</h4>
+                <div class="dist-list">
+                  <div v-for="d in visitStats.deviceDist" :key="d.name" class="dist-row">
+                    <span class="dist-name">{{ deviceIcon(d.name) }} {{ d.name || '未知' }}</span>
+                    <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: Math.min(100, (d.c / (visitStats.deviceDist[0]?.c || 1)) * 100) + '%' }"></div></div>
+                    <span class="dist-count">{{ d.c }}</span>
+                  </div>
+                  <div v-if="!visitStats.deviceDist.length" class="empty-state"><p>暂无数据</p></div>
+                </div>
+              </div>
+
+              <div class="dist-block">
+                <h4>访客来源 (Top 5)</h4>
+                <div class="dist-list">
+                  <div v-for="(c, i) in visitStats.topCountries" :key="i" class="dist-row">
+                    <span class="dist-name">🌍 {{ c.country }}{{ c.region ? ' · ' + c.region : '' }}{{ c.city ? ' · ' + c.city : '' }}</span>
+                    <div class="dist-bar-wrap"><div class="dist-bar" :style="{ width: Math.min(100, (c.c / (visitStats.topCountries[0]?.c || 1)) * 100) + '%' }"></div></div>
+                    <span class="dist-count">{{ c.c }}</span>
+                  </div>
+                  <div v-if="!visitStats.topCountries.length" class="empty-state"><p>暂无数据</p></div>
+                </div>
+              </div>
+
+              <div class="dist-block" v-if="visitStats.hourly.length">
+                <h4>今日 24 小时访问分布</h4>
+                <div class="hourly-chart">
+                  <div v-for="h in 24" :key="h" class="hourly-bar">
+                    <div class="hourly-fill" :style="{ height: (() => { const found = visitStats.hourly.find((x: any) => parseInt(x.hour) === h - 1); if (!found) return '0%'; const max = Math.max(...visitStats.hourly.map((x: any) => x.c)); return max ? (found.c / max * 100) + '%' : '0%'; })() }"></div>
+                    <div class="hourly-label">{{ String(h - 1).padStart(2, '0') }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 筛选 -->
+            <div class="visit-filters">
+              <div class="filter-row">
+                <input v-model="visitFilter.ip" placeholder="筛选IP" @keyup.enter="loadVisits" />
+                <input v-model="visitFilter.browser" placeholder="浏览器" @keyup.enter="loadVisits" />
+                <input v-model="visitFilter.os" placeholder="操作系统" @keyup.enter="loadVisits" />
+                <select v-model="visitFilter.device">
+                  <option value="">所有设备</option>
+                  <option value="desktop">💻 桌面</option>
+                  <option value="mobile">📱 手机</option>
+                  <option value="tablet">📲 平板</option>
+                </select>
+                <input v-model="visitFilter.path" placeholder="路径" @keyup.enter="loadVisits" />
+                <input v-model="visitFilter.since" type="datetime-local" @change="loadVisits" title="开始时间" />
+                <input v-model="visitFilter.until" type="datetime-local" @change="loadVisits" title="结束时间" />
+                <button class="btn-primary" @click="loadVisits">查询</button>
+                <button class="btn-secondary" @click="visitFilter = { ip: '', browser: '', os: '', device: '', path: '', since: '', until: '', limit: 50, offset: 0 }; loadVisits()">重置</button>
+              </div>
+            </div>
+
+            <!-- 清理按钮 -->
+            <div class="visit-actions">
+              <span class="visit-count">共 {{ visitTotal }} 条记录</span>
+              <button class="btn-tool" @click="loadVisits; loadVisitStats">刷新</button>
+              <button class="btn-tool" @click="cleanupVisits(30)">清理 30 天前</button>
+              <button class="btn-tool" @click="cleanupVisits(7)">清理 7 天前</button>
+              <button class="btn-delete" @click="cleanupVisits('all')">清空全部</button>
+            </div>
+
+            <!-- 访问列表 -->
+            <div class="visit-table-wrap">
+              <div v-if="visitLoading" class="empty-state"><p>加载中…</p></div>
+              <div v-else-if="visitList.length === 0" class="empty-state"><p>暂无访问记录</p></div>
+              <table v-else class="visit-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>路径</th>
+                    <th>IP</th>
+                    <th>地理位置</th>
+                    <th>浏览器</th>
+                    <th>操作系统</th>
+                    <th>设备</th>
+                    <th>语言</th>
+                    <th>分辨率</th>
+                    <th>来源</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="v in visitList" :key="v.id">
+                    <td class="cell-time">{{ formatVisitTime(v.visit_time) }}</td>
+                    <td class="cell-path"><code>{{ v.path }}</code></td>
+                    <td class="cell-ip">{{ v.ip || '-' }}</td>
+                    <td class="cell-geo">
+                      <span v-if="v.country">{{ v.country }}{{ v.region ? ' · ' + v.region : '' }}{{ v.city ? ' · ' + v.city : '' }}</span>
+                      <span v-else>-</span>
+                    </td>
+                    <td>{{ v.browser }}{{ v.browser_version ? ' ' + v.browser_version : '' }}</td>
+                    <td>{{ v.os || '-' }}</td>
+                    <td class="cell-device">
+                      <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">
+                        {{ deviceIcon(v.device_type) }} {{ v.device_type || 'desktop' }}{{ v.device_model ? ' · ' + v.device_model : '' }}
+                      </span>
+                    </td>
+                    <td>{{ v.language || '-' }}</td>
+                    <td>{{ v.screen_resolution || '-' }}</td>
+                    <td class="cell-referer" :title="v.referer">
+                      <span v-if="v.referer">{{ new URL(v.referer).hostname }}</span>
+                      <span v-else>直接访问</span>
+                    </td>
+                    <td><button class="btn-delete-sm" @click="deleteVisit(v.id)">删除</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1447,5 +1704,97 @@ onMounted(() => {
   .bookings-list table { font-size: 12px; }
   .bookings-list th, .bookings-list td { padding: 8px 4px; }
   .field-group input, .field-group textarea, .content-item-simple input, .content-item-simple textarea { min-height: 44px; font-size: 15px; border-radius: 8px; }
+}
+
+/* === 访客分析 === */
+.visit-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #e0e0e0;
+  transition: transform .2s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.stat-card.stat-today { background: linear-gradient(135deg, #4a90e2, #357abd); color: #fff; border-color: #357abd; }
+.stat-card.stat-today .stat-sub { color: rgba(255,255,255,0.85); }
+.stat-label { font-size: 13px; color: #6c757d; margin-bottom: 6px; }
+.stat-card.stat-today .stat-label { color: rgba(255,255,255,0.9); }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.stat-sub { font-size: 12px; margin-top: 4px; color: #6c757d; }
+
+.visit-distribution {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.dist-block {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 16px;
+}
+.dist-block h4 { margin: 0 0 12px 0; font-size: 15px; color: #333; }
+.dist-list { display: flex; flex-direction: column; gap: 8px; }
+.dist-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.dist-name { color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dist-bar-wrap { background: #f0f0f0; border-radius: 4px; height: 8px; overflow: hidden; }
+.dist-bar { background: linear-gradient(90deg, #4a90e2, #5ba0f2); height: 100%; transition: width .3s; }
+.dist-count { text-align: right; font-weight: 600; color: #333; }
+
+.hourly-chart {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+  height: 90px;
+  align-items: end;
+  margin-top: 8px;
+}
+.hourly-bar { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.hourly-fill { width: 100%; background: linear-gradient(180deg, #4a90e2, #357abd); border-radius: 2px 2px 0 0; min-height: 1px; transition: height .3s; }
+.hourly-label { font-size: 9px; color: #999; margin-top: 2px; }
+
+.visit-filters { background: #f8f9fa; padding: 14px; border-radius: 8px; margin-bottom: 14px; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filter-row input, .filter-row select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: #fff; }
+.filter-row input { min-width: 110px; }
+.filter-row select { min-width: 110px; }
+
+.visit-actions { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.visit-count { color: #666; font-size: 14px; margin-right: auto; }
+
+.visit-table-wrap { overflow-x: auto; border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; }
+.visit-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px; }
+.visit-table th { background: #f8f9fa; padding: 10px 8px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 1; }
+.visit-table td { padding: 9px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.visit-table tr:hover { background: #fafbfc; }
+.cell-time { white-space: nowrap; color: #666; font-size: 12px; }
+.cell-path code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px; color: #d63384; }
+.cell-ip { font-family: monospace; color: #0d6efd; }
+.cell-geo { color: #198754; }
+.cell-device .device-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e7f1ff; color: #0d6efd; }
+.cell-device .device-badge.device-mobile { background: #fff3cd; color: #856404; }
+.cell-device .device-badge.device-tablet { background: #d1ecf1; color: #0c5460; }
+.cell-referer { color: #6c757d; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-delete-sm { padding: 3px 10px; font-size: 12px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+.btn-delete-sm:hover { background: #c82333; }
+
+@media (max-width: 768px) {
+  .visit-stats { grid-template-columns: repeat(2, 1fr); }
+  .dist-row { grid-template-columns: 100px 1fr 30px; font-size: 12px; }
+  .stat-value { font-size: 22px; }
+  .filter-row input, .filter-row select { min-width: 0; flex: 1; }
 }
 </style>
