@@ -216,6 +216,10 @@ app.get('/api/admin/visits/stats', requireAdminAuth, (req, res) => {
   const monthCount = db.prepare('SELECT COUNT(*) as c FROM page_visits WHERE visit_time >= ?').get(monthAgo).c;
   const uniqueIps = db.prepare('SELECT COUNT(DISTINCT ip) as c FROM page_visits').get().c;
   const uniqueToday = db.prepare('SELECT COUNT(DISTINCT ip) as c FROM page_visits WHERE visit_time >= ?').get(todayStr).c;
+  // 独立访客 = (ip + device_type + browser + os + device_vendor + device_model) 唯一组合
+  const visitorKey = `ip || '|' || COALESCE(device_type,'') || '|' || COALESCE(browser,'') || '|' || COALESCE(os,'') || '|' || COALESCE(device_vendor,'') || '|' || COALESCE(device_model,'')`;
+  const uniqueVisitors = db.prepare(`SELECT COUNT(DISTINCT ${visitorKey}) as c FROM page_visits`).get().c;
+  const uniqueVisitorsToday = db.prepare(`SELECT COUNT(DISTINCT ${visitorKey}) as c FROM page_visits WHERE visit_time >= ?`).get(todayStr).c;
 
   const topPaths = db.prepare(`SELECT path, COUNT(*) as c FROM page_visits GROUP BY path ORDER BY c DESC LIMIT 10`).all();
   const topBrowsers = db.prepare(`SELECT browser as name, COUNT(*) as c FROM page_visits WHERE browser != '' GROUP BY browser ORDER BY c DESC LIMIT 5`).all();
@@ -230,9 +234,64 @@ app.get('/api/admin/visits/stats', requireAdminAuth, (req, res) => {
 
   res.json({
     total, today: todayCount, week: weekCount, month: monthCount,
-    uniqueIps, uniqueToday,
+    uniqueIps, uniqueToday, uniqueVisitors, uniqueVisitorsToday,
     topPaths, topBrowsers, topOs, deviceDist, topCountries, hourly
   });
+});
+
+// GET /api/admin/visitors — 按 (IP+设备+浏览器+OS) 分组的独立访客列表
+app.get('/api/admin/visitors', requireAdminAuth, (req, res) => {
+  const { limit = 200, offset = 0, since, until } = req.query;
+  const conds = [];
+  const args = [];
+  if (since) { conds.push('MAX(visit_time) >= ?'); args.push(since); }
+  if (until) { conds.push('MAX(visit_time) <= ?'); args.push(until); }
+  const having = conds.length ? 'HAVING ' + conds.join(' AND ') : '';
+  const key = `ip || '|' || COALESCE(device_type,'') || '|' || COALESCE(browser,'') || '|' || COALESCE(os,'') || '|' || COALESCE(device_vendor,'') || '|' || COALESCE(device_model,'')`;
+  const sql = `
+    SELECT
+      ${key} as visitor_key,
+      ip,
+      MAX(country) as country, MAX(region) as region, MAX(city) as city,
+      MAX(user_agent) as user_agent,
+      browser, browser_version, os,
+      device_type, device_vendor, device_model,
+      MAX(language) as language, MAX(screen_resolution) as screen_resolution,
+      COUNT(*) as pageview_count,
+      COUNT(DISTINCT path) as unique_paths,
+      MIN(visit_time) as first_visit,
+      MAX(visit_time) as last_visit
+    FROM page_visits
+    GROUP BY ${key}, ip, browser, browser_version, os, device_type, device_vendor, device_model
+    ${having}
+    ORDER BY MAX(visit_time) DESC
+    LIMIT ? OFFSET ?
+  `;
+  const visitors = db.prepare(sql).all(...args, Math.min(Number(limit) || 200, 1000), Number(offset) || 0);
+  const totalSql = `SELECT COUNT(DISTINCT ${key}) as c FROM page_visits`;
+  const total = db.prepare(totalSql).get().c;
+  res.json({ visitors, total, limit: Number(limit), offset: Number(offset) });
+});
+
+// GET /api/admin/visitors/pageviews?ip=&device_type=&browser=&os= — 指定访客的全部浏览
+app.get('/api/admin/visitors/pageviews', requireAdminAuth, (req, res) => {
+  const { ip, device_type = '', browser = '', os = '', device_vendor = '', device_model = '', limit = 500 } = req.query;
+  if (!ip) return res.json({ rows: [], total: 0 });
+  const sql = `
+    SELECT id, path, ip, country, region, city, browser, browser_version, os,
+           device_type, device_vendor, device_model, referer, language, screen_resolution, visit_time
+    FROM page_visits
+    WHERE ip = ? AND COALESCE(device_type,'') = ? AND COALESCE(browser,'') = ?
+      AND COALESCE(os,'') = ? AND COALESCE(device_vendor,'') = ? AND COALESCE(device_model,'') = ?
+    ORDER BY visit_time DESC
+    LIMIT ?
+  `;
+  const rows = db.prepare(sql).all(
+    ip, String(device_type), String(browser), String(os),
+    String(device_vendor), String(device_model),
+    Math.min(Number(limit) || 500, 2000)
+  );
+  res.json({ rows, total: rows.length });
 });
 
 // DELETE /api/admin/visits — 批量删除访客记录

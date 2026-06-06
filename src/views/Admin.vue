@@ -61,6 +61,16 @@ const visitFilter = ref({
 });
 const visitHourlyMax = ref(0);
 
+// 访客分组视图
+const visitViewMode = ref<'visitors' | 'pageviews'>('visitors');
+const visitorList = ref<any[]>([]);
+const visitorTotal = ref(0);
+const visitorLoading = ref(false);
+const selectedVisitor = ref<any | null>(null);
+const visitorPageviews = ref<any[]>([]);
+const visitorPageviewsLoading = ref(false);
+const showVisitorModal = ref(false);
+
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -720,8 +730,80 @@ function switchTab(name: string) {
   activeTab.value = name;
   if (name === 'visits') {
     loadVisitStats();
-    loadVisits();
+    if (visitViewMode.value === 'visitors') loadVisitors();
+    else loadVisits();
   }
+}
+
+// 切换子视图
+function switchVisitView(mode: 'visitors' | 'pageviews') {
+  visitViewMode.value = mode;
+  if (mode === 'visitors') loadVisitors();
+  else loadVisits();
+}
+
+async function loadVisitors() {
+  visitorLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    if (visitFilter.value.since) params.set('since', visitFilter.value.since.replace('T', ' ').slice(0, 19));
+    if (visitFilter.value.until) params.set('until', visitFilter.value.until.replace('T', ' ').slice(0, 19));
+    params.set('limit', '200');
+    const res = await fetchJson('/api/admin/visitors?' + params.toString(), { headers: getAuthHeaders() });
+    if (res) {
+      visitorList.value = (res as any).visitors || [];
+      visitorTotal.value = (res as any).total || 0;
+    }
+  } catch (e) { console.error('loadVisitors failed:', e); }
+  finally { visitorLoading.value = false; }
+}
+
+async function openVisitorDetail(v: any) {
+  selectedVisitor.value = v;
+  showVisitorModal.value = true;
+  visitorPageviews.value = [];
+  visitorPageviewsLoading.value = true;
+  try {
+    const params = new URLSearchParams({
+      ip: v.ip || '',
+      device_type: v.device_type || '',
+      browser: v.browser || '',
+      os: v.os || '',
+      device_vendor: v.device_vendor || '',
+      device_model: v.device_model || ''
+    });
+    const res = await fetchJson('/api/admin/visitors/pageviews?' + params.toString(), { headers: getAuthHeaders() });
+    if (res) visitorPageviews.value = (res as any).rows || [];
+  } catch (e) { console.error('loadVisitorPageviews failed:', e); }
+  finally { visitorPageviewsLoading.value = false; }
+}
+
+function closeVisitorModal() {
+  showVisitorModal.value = false;
+  selectedVisitor.value = null;
+  visitorPageviews.value = [];
+}
+
+async function deleteVisitor(v: any) {
+  const msg = `确定删除该访客的全部 ${v.pageview_count} 条记录吗？`;
+  if (!confirm(msg)) return;
+  // 逐条删除
+  for (const pv of visitorPageviews.value.length ? visitorPageviews.value : await fetchAllPageviewsForVisitor(v)) {
+    await fetchJson('/api/admin/visits/' + pv.id, { method: 'DELETE', headers: getAuthHeaders() });
+  }
+  closeVisitorModal();
+  loadVisitors();
+  loadVisitStats();
+}
+
+async function fetchAllPageviewsForVisitor(v: any) {
+  const params = new URLSearchParams({
+    ip: v.ip || '', device_type: v.device_type || '',
+    browser: v.browser || '', os: v.os || '',
+    device_vendor: v.device_vendor || '', device_model: v.device_model || ''
+  });
+  const res = await fetchJson('/api/admin/visitors/pageviews?' + params.toString(), { headers: getAuthHeaders() });
+  return (res as any)?.rows || [];
 }
 
 async function deleteVisit(id: number) {
@@ -1276,25 +1358,26 @@ onMounted(() => {
             <!-- 统计卡片 -->
             <div class="visit-stats" v-if="visitStats">
               <div class="stat-card">
-                <div class="stat-label">总访问量</div>
+                <div class="stat-label">总浏览量</div>
                 <div class="stat-value">{{ visitStats.total }}</div>
               </div>
               <div class="stat-card stat-today">
-                <div class="stat-label">今日访问</div>
+                <div class="stat-label">今日浏览</div>
                 <div class="stat-value">{{ visitStats.today }}</div>
-                <div class="stat-sub">IP: {{ visitStats.uniqueToday }}</div>
+                <div class="stat-sub">访客 {{ visitStats.uniqueVisitorsToday || 0 }} · IP {{ visitStats.uniqueToday }}</div>
+              </div>
+              <div class="stat-card stat-visitor">
+                <div class="stat-label">独立访客</div>
+                <div class="stat-value">{{ visitStats.uniqueVisitors || 0 }}</div>
+                <div class="stat-sub">IP {{ visitStats.uniqueIps }}</div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">本周访问</div>
+                <div class="stat-label">本周浏览</div>
                 <div class="stat-value">{{ visitStats.week }}</div>
               </div>
               <div class="stat-card">
-                <div class="stat-label">本月访问</div>
+                <div class="stat-label">本月浏览</div>
                 <div class="stat-value">{{ visitStats.month }}</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-label">独立 IP</div>
-                <div class="stat-value">{{ visitStats.uniqueIps }}</div>
               </div>
             </div>
 
@@ -1371,8 +1454,27 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- 筛选 -->
-            <div class="visit-filters">
+            <!-- 子视图切换 -->
+            <div class="visit-subtabs">
+              <button :class="['subtab', { active: visitViewMode === 'visitors' }]" @click="switchVisitView('visitors')">
+                👤 访客 (按设备分组)
+              </button>
+              <button :class="['subtab', { active: visitViewMode === 'pageviews' }]" @click="switchVisitView('pageviews')">
+                📄 全部浏览记录
+              </button>
+            </div>
+
+            <!-- 时间筛选 (两个视图通用) -->
+            <div class="visit-filters" v-if="visitViewMode === 'visitors'">
+              <div class="filter-row">
+                <input v-model="visitFilter.since" type="datetime-local" @change="loadVisitors" title="开始时间 (筛选最近访问)" />
+                <input v-model="visitFilter.until" type="datetime-local" @change="loadVisitors" title="结束时间" />
+                <button class="btn-primary" @click="loadVisitors">查询</button>
+                <button class="btn-secondary" @click="visitFilter.since = ''; visitFilter.until = ''; loadVisitors()">重置</button>
+              </div>
+            </div>
+
+            <div class="visit-filters" v-else>
               <div class="filter-row">
                 <input v-model="visitFilter.ip" placeholder="筛选IP" @keyup.enter="loadVisits" />
                 <input v-model="visitFilter.browser" placeholder="浏览器" @keyup.enter="loadVisits" />
@@ -1391,17 +1493,75 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- 清理按钮 -->
-            <div class="visit-actions">
-              <span class="visit-count">共 {{ visitTotal }} 条记录</span>
+            <!-- 操作栏 -->
+            <div class="visit-actions" v-if="visitViewMode === 'visitors'">
+              <span class="visit-count">共 {{ visitorTotal }} 位独立访客 (按 IP+设备 分组)</span>
+              <button class="btn-tool" @click="loadVisitors; loadVisitStats">刷新</button>
+              <button class="btn-tool" @click="cleanupVisits(30)">清理 30 天前</button>
+              <button class="btn-tool" @click="cleanupVisits(7)">清理 7 天前</button>
+              <button class="btn-delete" @click="cleanupVisits('all')">清空全部</button>
+            </div>
+            <div class="visit-actions" v-else>
+              <span class="visit-count">共 {{ visitTotal }} 条浏览记录</span>
               <button class="btn-tool" @click="loadVisits; loadVisitStats">刷新</button>
               <button class="btn-tool" @click="cleanupVisits(30)">清理 30 天前</button>
               <button class="btn-tool" @click="cleanupVisits(7)">清理 7 天前</button>
               <button class="btn-delete" @click="cleanupVisits('all')">清空全部</button>
             </div>
 
-            <!-- 访问列表 -->
-            <div class="visit-table-wrap">
+            <!-- 访客视图: 每个 (IP+设备) 合并显示 -->
+            <div class="visit-table-wrap" v-if="visitViewMode === 'visitors'">
+              <div v-if="visitorLoading" class="empty-state"><p>加载中…</p></div>
+              <div v-else-if="visitorList.length === 0" class="empty-state"><p>暂无访客记录</p></div>
+              <table v-else class="visit-table">
+                <thead>
+                  <tr>
+                    <th>访客</th>
+                    <th>IP · 地理位置</th>
+                    <th>设备</th>
+                    <th>浏览器</th>
+                    <th>操作系统</th>
+                    <th>浏览页数</th>
+                    <th>最近访问</th>
+                    <th>首次访问</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(v, idx) in visitorList" :key="v.visitor_key || idx" class="visitor-row" @click="openVisitorDetail(v)">
+                    <td class="cell-visitor">
+                      <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">{{ deviceIcon(v.device_type) }}</span>
+                      <strong>访客 #{{ idx + 1 }}</strong>
+                    </td>
+                    <td class="cell-ip">
+                      <div class="ip-line">{{ v.ip || '-' }}</div>
+                      <div class="geo-line" v-if="v.country">{{ v.country }}{{ v.region ? ' · ' + v.region : '' }}{{ v.city ? ' · ' + v.city : '' }}</div>
+                      <div class="geo-line" v-else style="color:#999">-</div>
+                    </td>
+                    <td>
+                      <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">
+                        {{ v.device_type || 'desktop' }}{{ v.device_vendor ? ' · ' + v.device_vendor : '' }}{{ v.device_model ? ' ' + v.device_model : '' }}
+                      </span>
+                    </td>
+                    <td>{{ v.browser }}{{ v.browser_version ? ' ' + v.browser_version : '' }}</td>
+                    <td>{{ v.os || '-' }}</td>
+                    <td class="cell-counts">
+                      <span class="count-pill">{{ v.pageview_count }} 次</span>
+                      <span class="count-sub">{{ v.unique_paths }} 页</span>
+                    </td>
+                    <td class="cell-time">{{ formatVisitTime(v.last_visit) }}</td>
+                    <td class="cell-time">{{ formatVisitTime(v.first_visit) }}</td>
+                    <td @click.stop>
+                      <button class="btn-primary-sm" @click="openVisitorDetail(v)">查看明细</button>
+                      <button class="btn-delete-sm" @click="deleteVisitor(v)">删除访客</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 浏览记录视图: 每次访问一行 -->
+            <div class="visit-table-wrap" v-else>
               <div v-if="visitLoading" class="empty-state"><p>加载中…</p></div>
               <div v-else-if="visitList.length === 0" class="empty-state"><p>暂无访问记录</p></div>
               <table v-else class="visit-table">
@@ -1466,6 +1626,54 @@ onMounted(() => {
             <div class="detail-row"><span class="label">时间:</span><span>{{ selectedBooking.time }}</span></div>
             <div class="detail-row"><span class="label">课程:</span><span>{{ selectedBooking.course }}</span></div>
             <div class="detail-row"><span class="label">预约时间:</span><span>{{ new Date(selectedBooking.created_at).toLocaleString('zh-CN') }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 访客详情弹窗 -->
+      <div v-if="showVisitorModal" class="modal-overlay" @click="closeVisitorModal">
+        <div class="modal-content modal-content-wide" @click.stop>
+          <div class="modal-header">
+            <h3>访客详情 — {{ selectedVisitor?.ip }} ({{ selectedVisitor?.city || '未知' }})</h3>
+            <button @click="closeVisitorModal">×</button>
+          </div>
+          <div class="modal-body" v-if="selectedVisitor">
+            <div class="detail-row"><span class="label">设备:</span><span>{{ deviceIcon(selectedVisitor.device_type) }} {{ selectedVisitor.device_type || 'desktop' }} {{ selectedVisitor.device_vendor || '' }} {{ selectedVisitor.device_model || '' }}</span></div>
+            <div class="detail-row"><span class="label">浏览器:</span><span>{{ selectedVisitor.browser }} {{ selectedVisitor.browser_version }}</span></div>
+            <div class="detail-row"><span class="label">操作系统:</span><span>{{ selectedVisitor.os || '-' }}</span></div>
+            <div class="detail-row"><span class="label">语言:</span><span>{{ selectedVisitor.language || '-' }}</span></div>
+            <div class="detail-row"><span class="label">分辨率:</span><span>{{ selectedVisitor.screen_resolution || '-' }}</span></div>
+            <div class="detail-row"><span class="label">浏览次数:</span><span><strong>{{ selectedVisitor.pageview_count }}</strong> 次 / <strong>{{ selectedVisitor.unique_paths }}</strong> 不同页</span></div>
+            <div class="detail-row"><span class="label">首次访问:</span><span>{{ formatVisitTime(selectedVisitor.first_visit) }}</span></div>
+            <div class="detail-row"><span class="label">最近访问:</span><span>{{ formatVisitTime(selectedVisitor.last_visit) }}</span></div>
+            <div class="detail-row"><span class="label">UA:</span><span class="ua-text">{{ selectedVisitor.user_agent }}</span></div>
+
+            <h4 style="margin: 18px 0 8px;">浏览历史 ({{ visitorPageviews.length }} 条)</h4>
+            <div v-if="visitorPageviewsLoading" class="empty-state"><p>加载中…</p></div>
+            <div v-else-if="visitorPageviews.length === 0" class="empty-state"><p>暂无浏览记录</p></div>
+            <table v-else class="visit-table" style="font-size:12px">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>路径</th>
+                  <th>来源</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="pv in visitorPageviews" :key="pv.id">
+                  <td class="cell-time" style="white-space:nowrap">{{ formatVisitTime(pv.visit_time) }}</td>
+                  <td class="cell-path"><code>{{ pv.path }}</code></td>
+                  <td class="cell-referer" :title="pv.referer">
+                    <span v-if="pv.referer">{{ new URL(pv.referer).hostname }}</span>
+                    <span v-else style="color:#999">直接访问</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style="margin-top: 16px; text-align: right;">
+              <button class="btn-delete" @click="deleteVisitor(selectedVisitor)">删除该访客全部记录</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1724,8 +1932,29 @@ onMounted(() => {
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .stat-card.stat-today { background: linear-gradient(135deg, #4a90e2, #357abd); color: #fff; border-color: #357abd; }
 .stat-card.stat-today .stat-sub { color: rgba(255,255,255,0.85); }
-.stat-label { font-size: 13px; color: #6c757d; margin-bottom: 6px; }
 .stat-card.stat-today .stat-label { color: rgba(255,255,255,0.9); }
+.stat-card.stat-visitor { background: linear-gradient(135deg, #28a745, #1e7e34); color: #fff; border-color: #1e7e34; }
+.stat-card.stat-visitor .stat-sub { color: rgba(255,255,255,0.85); }
+.stat-card.stat-visitor .stat-label { color: rgba(255,255,255,0.9); }
+
+.visit-subtabs { display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 2px solid #e9ecef; padding-bottom: 0; }
+.subtab { padding: 10px 18px; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-size: 14px; color: #666; margin-bottom: -2px; transition: all .2s; font-weight: 500; }
+.subtab:hover { color: #4a90e2; }
+.subtab.active { color: #4a90e2; border-bottom-color: #4a90e2; font-weight: 600; }
+
+.visitor-row { cursor: pointer; transition: background .15s; }
+.visitor-row:hover { background: #f0f7ff !important; }
+.cell-visitor { display: flex; align-items: center; gap: 8px; }
+.cell-visitor strong { color: #333; font-size: 14px; }
+.cell-counts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.count-pill { background: #4a90e2; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.count-sub { color: #666; font-size: 11px; }
+.cell-ip .ip-line { font-family: monospace; color: #0d6efd; font-weight: 500; }
+.cell-ip .geo-line { color: #198754; font-size: 11px; margin-top: 2px; }
+.modal-content-wide { max-width: 800px !important; max-height: 85vh; overflow-y: auto; }
+.ua-text { font-family: monospace; font-size: 11px; color: #666; word-break: break-all; background: #f5f5f5; padding: 6px 8px; border-radius: 4px; }
+.btn-primary-sm { padding: 4px 12px; font-size: 12px; background: #4a90e2; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; }
+.btn-primary-sm:hover { background: #357abd; }
 .stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
 .stat-sub { font-size: 12px; margin-top: 4px; color: #6c757d; }
 
