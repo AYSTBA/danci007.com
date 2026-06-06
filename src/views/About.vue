@@ -289,7 +289,7 @@ onUnmounted(stopBannerAutoPlay)
   height: 56vw;
   max-height: 300px;
   min-height: 200px;
-  background: #fafafa;
+  background: #e8e8e8;
   border-radius: 16px;
   overflow: hidden;
 }
@@ -298,7 +298,7 @@ onUnmounted(stopBannerAutoPlay)
   position: absolute;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   opacity: 0;
   transition: opacity 0.7s ease;
 }

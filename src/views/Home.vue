@@ -545,7 +545,7 @@ const siteTitle = computed(() => {
   position: relative;
   width: 100%;
   height: 620px;
-  background: #fafafa;
+  background: #e8e8e8;
   border-radius: 20px;
   overflow: hidden;
 }
@@ -553,7 +553,7 @@ const siteTitle = computed(() => {
 .banner-img {
   position: absolute;
   width: 100%; height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   opacity: 0;
   transition: opacity 0.7s ease;
 }

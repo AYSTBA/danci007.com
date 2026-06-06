@@ -692,7 +692,7 @@ onMounted(() => {
 .card-banner img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 .card-banner-placeholder {
@@ -795,8 +795,8 @@ onMounted(() => {
 }
 
 /* ── Banner ── */
-.banner { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; }
-.banner-img { width: 100%; height: 100%; object-fit: cover; }
+.banner { width: 100%; aspect-ratio: 16/9; overflow: hidden; position: relative; background: #e8e8e8; }
+.banner-img { width: 100%; height: 100%; object-fit: contain; }
 .banner-placeholder {
   width: 100%; height: 100%;
   background: linear-gradient(to bottom, var(--primary-lighter), var(--primary-light), var(--primary-dark));
