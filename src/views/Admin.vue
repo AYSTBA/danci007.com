@@ -515,6 +515,10 @@ const addBanner = () => {
 
 const saveBanner = async (banner: Banner) => {
   try {
+    if (uploadLoading.value) {
+      alert('图片上传中，请稍后再保存');
+      return;
+    }
     const bannerData = { ...banner, active: banner.active ? 1 : 0 };
     let response;
     if (banner.id > 1000000000000) {
@@ -528,7 +532,8 @@ const saveBanner = async (banner: Banner) => {
         banner.id = result.id;
         showSaveSuccess('Banner已保存');
       } else {
-        alert('保存失败，请重试');
+        const err = await response.json().catch(() => ({}));
+        alert('保存失败：' + (err.details || err.error || '未知错误'));
       }
     } else {
       response = await authFetch(`/api/banners/${banner.id}`, {
@@ -539,7 +544,8 @@ const saveBanner = async (banner: Banner) => {
       if (response.ok) {
         showSaveSuccess('Banner已更新');
       } else {
-        alert('更新失败，请重试');
+        const err = await response.json().catch(() => ({}));
+        alert('更新失败：' + (err.details || err.error || '未知错误'));
       }
     }
   } catch (error: any) {
@@ -669,15 +675,14 @@ const handleMarkdownUploadSimple = (event: Event, key: string) => {
   }
 };
 
-const handleEditorConfirm = (file: File) => {
+const handleEditorConfirm = async (file: File) => {
   // 立刻关闭编辑器，给用户即时反馈
   const cb = editorCallback.value;
   editorVisible.value = false;
   editorFile.value = null;
   editorCallback.value = null;
-  // 异步执行上传（cb 内部会启动 uploadImage 并显示遮罩）
   if (cb) {
-    cb(file);
+    await cb(file);
   }
 };
 

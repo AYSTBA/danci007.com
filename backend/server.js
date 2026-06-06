@@ -833,7 +833,7 @@ function collectReferencedUploadPaths() {
     const m = val.match(/\/uploads\/([^\s"'<>)]+)/g);
     if (m) m.forEach(p => refSet.add(p.replace('/uploads/', '')));
   };
-  for (const table of ['banners', 'teachers', 'page_contents']) {
+  for (const table of ['banners', 'teachers', 'page_contents', 'courses']) {
     try {
       const cols = db.prepare(`PRAGMA table_info(${table})`).all();
       for (const col of cols) {
