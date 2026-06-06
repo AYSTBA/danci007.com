@@ -1,1 +1,0 @@
-var e=`/translate-languange-switch-svgrepo-com.svg`;export{e as t};
