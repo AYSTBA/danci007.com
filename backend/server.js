@@ -139,6 +139,93 @@ async function lookupGeo(ip) {
   return { country: '', region: '', city: '' };
 }
 
+// ── UA 解析增强 ──
+
+// Windows 版本细化: NT 10.0 + Edge 110+ 或 Chrome 110+ → 实际是 Win11
+function refineWindowsVersion(ua, osName, osVersion, browserName, browserVersion) {
+  if (!/Windows NT 10\.0/.test(ua)) return `${osName || ''} ${osVersion || ''}`.trim();
+  // Edge/Chrome 110+ 在 Windows 11 上发布, Win10 只支持到 Edge 110 (2023年初)
+  // Edge 111+ (2023年中) 之后只在 Win10 22H2 但更常见是 Win11
+  const major = parseInt((browserVersion || '').split('.')[0]);
+  if (browserName === 'Edge' || browserName === 'Chrome') {
+    if (!isNaN(major) && major >= 111) return 'Windows 11';
+    if (!isNaN(major) && major >= 100) return 'Windows 10/11'; // 模糊
+    return 'Windows 10';
+  }
+  return 'Windows 10';
+}
+
+// macOS 版本细化: 11+ 统称 macOS (不是 Mac OS X)
+function refineMacOS(osName, osVersion) {
+  if (!osName) return '';
+  if (osName === 'Mac OS') {
+    const m = (osVersion || '').match(/(\d+)\.(\d+)/);
+    if (m) {
+      const major = parseInt(m[1]);
+      const minor = parseInt(m[2]);
+      // Mac OS X 10.x → macOS 11+ (Big Sur 2020)
+      if (major === 10) {
+        if (minor >= 15) return 'macOS 10.15 Catalina';
+        if (minor >= 14) return 'macOS 10.14 Mojave';
+        if (minor >= 13) return 'macOS 10.13 High Sierra';
+        return 'macOS 10.' + minor;
+      }
+      return 'macOS ' + major;
+    }
+    return 'macOS';
+  }
+  return `${osName} ${osVersion || ''}`.trim();
+}
+
+// 可疑 UA 检测
+function detectSuspiciousUA(ua, parsed) {
+  const reasons = [];
+  // iOS + Edge/Chrome with version > 130: Edge 130 (2024) 才开始较多人用
+  // iOS + Edge 149 (2025) 的组合很罕见 (iOS 用户 99% 用 Safari)
+  if ((parsed.os.name === 'iOS' || /iPhone|iPad/.test(ua)) &&
+      parsed.browser.name === 'Edge' &&
+      parseInt((parsed.browser.version || '0').split('.')[0]) >= 130) {
+    reasons.push('iOS+Edge 较罕见, 可能是伪造 UA');
+  }
+  // Linux 桌面 + Edge (Linux 不支持官方 Edge)
+  if (parsed.os.name === 'Linux' && parsed.device.type !== 'mobile' && parsed.device.type !== 'tablet' &&
+      parsed.browser.name === 'Edge' && parseInt((parsed.browser.version || '0').split('.')[0]) >= 100) {
+    reasons.push('Linux 桌面无官方 Edge');
+  }
+  // Android + Safari (Android 没有 Safari, 只有 Chrome)
+  if (parsed.os.name === 'Android' && parsed.browser.name === 'Safari') {
+    reasons.push('Android 无 Safari');
+  }
+  // 设备型号包含 X11 / x86 等服务器标识
+  if (/X11|bot|headless|phantom|wget|curl/i.test(ua) && !/mozilla/i.test(ua.toLowerCase().slice(0, 20))) {
+    reasons.push('可疑 UA 字符串');
+  }
+  return reasons;
+}
+
+// 设备型号友好名称映射 (技术代号 → 用户能看懂的)
+const DEVICE_NAME_MAP = {
+  '23124RN87C': 'Redmi Note 13 5G',
+  '23113RKC6C': 'Redmi Note 12 Pro',
+  '2201116SC': 'Redmi Note 11',
+  '22041211AC': 'Redmi K50',
+};
+function refineDeviceName(vendor, model) {
+  if (!model) return { vendor: vendor || '', model: '', friendly: '' };
+  const code = model.toUpperCase();
+  if (DEVICE_NAME_MAP[code]) {
+    return { vendor: vendor || 'Xiaomi/Redmi', model, friendly: DEVICE_NAME_MAP[code] };
+  }
+  return { vendor: vendor || '', model, friendly: '' };
+}
+
+// 综合 OS 显示
+function buildOsDisplay(ua, parsedOs) {
+  const refined = refineWindowsVersion(ua, parsedOs.name, parsedOs.version, parsedOs.browser?.name || '', parsedOs.browser?.version || '');
+  if (refined) return refined;
+  return refineMacOS(parsedOs.name, parsedOs.version);
+}
+
 // POST /api/visit — 前端埋点接口 (公开)
 app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
   try {
@@ -157,16 +244,20 @@ app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
     const parser = new UAParser(ua);
     const uaResult = parser.getResult();
     const browser = uaResult.browser;
-    const os = uaResult.os;
+    const osRaw = uaResult.os;
     const device = uaResult.device;
+    const osWithBrowser = { name: osRaw.name, version: osRaw.version, browser: { name: browser.name, version: browser.version } };
+    const suspiciousReasons = detectSuspiciousUA(ua, uaResult);
+    const deviceRefined = refineDeviceName(device.vendor, device.model);
+    const osDisplay = buildOsDisplay(ua, osWithBrowser);
 
     // 异步解析地理 (不阻塞响应)
     lookupGeo(ip).then(geo => {
       try {
         db.prepare(`
           INSERT INTO page_visits
-            (path, ip, country, region, city, user_agent, browser, browser_version, os, device_type, device_vendor, device_model, referer, language, screen_resolution)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (path, ip, country, region, city, user_agent, browser, browser_version, os, device_type, device_vendor, device_model, suspicious, referer, language, screen_resolution)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           p.slice(0, 200),
           ip,
@@ -174,10 +265,11 @@ app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
           ua.slice(0, 500),
           browser.name || '',
           browser.version || '',
-          `${os.name || ''} ${os.version || ''}`.trim(),
+          osDisplay,
           device.type || 'desktop',
-          device.vendor || '',
-          device.model || '',
+          deviceRefined.vendor,
+          deviceRefined.friendly || deviceRefined.model,
+          suspiciousReasons.join('|'),
           String(referer).slice(0, 500),
           String(language).slice(0, 50),
           String(screen_resolution).slice(0, 50)
@@ -206,7 +298,7 @@ app.get('/api/admin/visits', requireAdminAuth, (req, res) => {
   if (since) { conds.push('visit_time >= ?'); args.push(since); }
   if (until) { conds.push('visit_time <= ?'); args.push(until); }
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
-  const sql = `SELECT * FROM page_visits ${where} ORDER BY visit_time DESC LIMIT ? OFFSET ?`;
+  const sql = `SELECT id, path, ip, country, region, city, user_agent, browser, browser_version, os, device_type, device_vendor, device_model, suspicious, referer, language, screen_resolution, visit_time FROM page_visits ${where} ORDER BY visit_time DESC LIMIT ? OFFSET ?`;
   const rows = db.prepare(sql).all(...args, Math.min(Number(limit) || 100, 1000), Number(offset) || 0);
   const total = db.prepare(`SELECT COUNT(*) as c FROM page_visits ${where}`).get(...args).c;
   res.json({ rows, total, limit: Number(limit), offset: Number(offset) });
@@ -265,6 +357,7 @@ app.get('/api/admin/visitors', requireAdminAuth, (req, res) => {
       MAX(user_agent) as user_agent,
       browser, browser_version, os,
       device_type, device_vendor, device_model,
+      MAX(suspicious) as suspicious,
       MAX(language) as language, MAX(screen_resolution) as screen_resolution,
       COUNT(*) as pageview_count,
       COUNT(DISTINCT path) as unique_paths,
@@ -288,7 +381,7 @@ app.get('/api/admin/visitors/pageviews', requireAdminAuth, (req, res) => {
   if (!ip) return res.json({ rows: [], total: 0 });
   const sql = `
     SELECT id, path, ip, country, region, city, browser, browser_version, os,
-           device_type, device_vendor, device_model, referer, language, screen_resolution, visit_time
+           device_type, device_vendor, device_model, suspicious, referer, language, screen_resolution, visit_time
     FROM page_visits
     WHERE ip = ? AND COALESCE(device_type,'') = ? AND COALESCE(browser,'') = ?
       AND COALESCE(os,'') = ? AND COALESCE(device_vendor,'') = ? AND COALESCE(device_model,'') = ?
@@ -479,6 +572,7 @@ const initDb = () => {
       device_type TEXT DEFAULT '',
       device_vendor TEXT DEFAULT '',
       device_model TEXT DEFAULT '',
+      suspicious TEXT DEFAULT '',
       referer TEXT DEFAULT '',
       language TEXT DEFAULT '',
       screen_resolution TEXT DEFAULT '',
@@ -487,6 +581,8 @@ const initDb = () => {
     CREATE INDEX IF NOT EXISTS idx_visit_time ON page_visits(visit_time DESC);
     CREATE INDEX IF NOT EXISTS idx_visit_ip ON page_visits(ip);
   `);
+  // 兼容老表: 添加新列
+  try { db.exec(`ALTER TABLE page_visits ADD COLUMN suspicious TEXT DEFAULT ''`); } catch { /* 已存在 */ }
 
   const defaultContents = db.prepare('SELECT COUNT(*) as count FROM page_contents').get().count;
   if (defaultContents === 0) {

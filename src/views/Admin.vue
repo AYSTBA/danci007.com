@@ -843,6 +843,23 @@ function formatVisitTime(t: string) {
   return d.toLocaleString('zh-CN', { hour12: false });
 }
 
+function timeAgo(t: string): string {
+  if (!t) return '';
+  const d = new Date(t.includes('Z') || t.includes('+') ? t : t.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  if (diff < 0) return '未来';
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return s + ' 秒前';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' 分钟前';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' 小时前';
+  const day = Math.floor(h / 24);
+  if (day < 30) return day + ' 天前';
+  return d.toLocaleDateString('zh-CN');
+}
+
 onMounted(() => {
   checkLogin();
   if (isLoggedIn.value) loadData();
@@ -1516,44 +1533,54 @@ onMounted(() => {
               <table v-else class="visit-table">
                 <thead>
                   <tr>
-                    <th>访客</th>
+                    <th>最近访问</th>
                     <th>IP · 地理位置</th>
                     <th>设备</th>
-                    <th>浏览器</th>
-                    <th>操作系统</th>
-                    <th>浏览页数</th>
-                    <th>最近访问</th>
+                    <th>浏览器 / 操作系统</th>
+                    <th>浏览</th>
                     <th>首次访问</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(v, idx) in visitorList" :key="v.visitor_key || idx" class="visitor-row" @click="openVisitorDetail(v)">
-                    <td class="cell-visitor">
-                      <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">{{ deviceIcon(v.device_type) }}</span>
-                      <strong>访客 #{{ idx + 1 }}</strong>
+                    <td class="cell-time">
+                      <div>{{ formatVisitTime(v.last_visit) }}</div>
+                      <span class="time-ago">{{ timeAgo(v.last_visit) }}</span>
                     </td>
                     <td class="cell-ip">
                       <div class="ip-line">{{ v.ip || '-' }}</div>
-                      <div class="geo-line" v-if="v.country">{{ v.country }}{{ v.region ? ' · ' + v.region : '' }}{{ v.city ? ' · ' + v.city : '' }}</div>
-                      <div class="geo-line" v-else style="color:#999">-</div>
+                      <div class="geo-line" v-if="v.country">📍 {{ v.country }}{{ v.region ? ' · ' + v.region : '' }}{{ v.city ? ' · ' + v.city : '' }}</div>
+                      <div class="geo-line" v-else style="color:#999">📍 未知</div>
                     </td>
                     <td>
-                      <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">
-                        {{ v.device_type || 'desktop' }}{{ v.device_vendor ? ' · ' + v.device_vendor : '' }}{{ v.device_model ? ' ' + v.device_model : '' }}
-                      </span>
+                      <div class="device-line">
+                        <span class="device-badge" :class="'device-' + (v.device_type || 'desktop')">
+                          {{ deviceIcon(v.device_type) }} {{ v.device_type || 'desktop' }}
+                        </span>
+                        <span class="device-model" v-if="v.device_vendor || v.device_model">
+                          {{ v.device_vendor }} {{ v.device_model }}
+                        </span>
+                      </div>
                     </td>
-                    <td>{{ v.browser }}{{ v.browser_version ? ' ' + v.browser_version : '' }}</td>
-                    <td>{{ v.os || '-' }}</td>
+                    <td>
+                      <div class="browser-line">
+                        <strong>{{ v.browser }}</strong>
+                        <span class="browser-ver">{{ v.browser_version }}</span>
+                      </div>
+                      <div class="os-line">
+                        {{ v.os || '-' }}
+                        <span v-if="v.suspicious" class="suspicious-badge" :title="v.suspicious">⚠️ 可疑</span>
+                      </div>
+                    </td>
                     <td class="cell-counts">
                       <span class="count-pill">{{ v.pageview_count }} 次</span>
                       <span class="count-sub">{{ v.unique_paths }} 页</span>
                     </td>
-                    <td class="cell-time">{{ formatVisitTime(v.last_visit) }}</td>
                     <td class="cell-time">{{ formatVisitTime(v.first_visit) }}</td>
                     <td @click.stop>
-                      <button class="btn-primary-sm" @click="openVisitorDetail(v)">查看明细</button>
-                      <button class="btn-delete-sm" @click="deleteVisitor(v)">删除访客</button>
+                      <button class="btn-primary-sm" @click="openVisitorDetail(v)">详情</button>
+                      <button class="btn-delete-sm" @click="deleteVisitor(v)">删除</button>
                     </td>
                   </tr>
                 </tbody>
@@ -1949,8 +1976,15 @@ onMounted(() => {
 .cell-counts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .count-pill { background: #4a90e2; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
 .count-sub { color: #666; font-size: 11px; }
-.cell-ip .ip-line { font-family: monospace; color: #0d6efd; font-weight: 500; }
+.cell-ip .ip-line { font-family: monospace; color: #0d6efd; font-weight: 500; font-size: 13px; }
 .cell-ip .geo-line { color: #198754; font-size: 11px; margin-top: 2px; }
+.cell-time .time-ago { display: block; color: #999; font-size: 11px; margin-top: 2px; }
+.device-line { display: flex; flex-direction: column; gap: 2px; }
+.device-line .device-model { color: #555; font-size: 11px; }
+.browser-line { font-size: 13px; }
+.browser-line .browser-ver { color: #999; font-size: 11px; margin-left: 4px; }
+.os-line { font-size: 12px; color: #555; margin-top: 2px; }
+.suspicious-badge { display: inline-block; background: #fff3cd; color: #856404; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-left: 4px; cursor: help; }
 .modal-content-wide { max-width: 800px !important; max-height: 85vh; overflow-y: auto; }
 .ua-text { font-family: monospace; font-size: 11px; color: #666; word-break: break-all; background: #f5f5f5; padding: 6px 8px; border-radius: 4px; }
 .btn-primary-sm { padding: 4px 12px; font-size: 12px; background: #4a90e2; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; }
