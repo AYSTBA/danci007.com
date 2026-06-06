@@ -78,6 +78,7 @@ const visitViewMode = ref<'visitors' | 'pageviews'>('visitors');
 const visitorList = ref<any[]>([]);
 const visitorTotal = ref(0);
 const visitorLoading = ref(false);
+const visitorFilterOffset = ref(0);
 const selectedVisitor = ref<any | null>(null);
 const visitorPageviews = ref<any[]>([]);
 const visitorPageviewsLoading = ref(false);
@@ -107,6 +108,8 @@ async function loadVisits() {
 
 function switchVisitView(mode: 'visitors' | 'pageviews') {
   visitViewMode.value = mode;
+  visitFilter.value.offset = 0;
+  visitorFilterOffset.value = 0;
   if (mode === 'visitors') loadVisitors();
   else loadVisits();
 }
@@ -117,6 +120,7 @@ async function loadVisitors() {
     const params = new URLSearchParams();
     if (visitFilter.value.since) params.set('since', visitFilter.value.since.replace('T', ' ').slice(0, 19));
     if (visitFilter.value.until) params.set('until', visitFilter.value.until.replace('T', ' ').slice(0, 19));
+    params.set('offset', String(visitorFilterOffset.value));
     params.set('limit', '200');
     const res = await fetchJson('/api/admin/visitors?' + params.toString(), { headers: getAuthHeaders() });
     if (res) {
@@ -185,6 +189,53 @@ async function fetchAllPageviewsForVisitor(v: any) {
   });
   const res = await fetchJson('/api/admin/visitors/pageviews?' + params.toString(), { headers: getAuthHeaders() });
   return (res as any)?.rows || [];
+}
+
+// 分页
+function nextPage(mode: 'visitors' | 'pageviews') {
+  if (mode === 'pageviews') {
+    const totalPages = Math.ceil(visitTotal.value / (visitFilter.value.limit || 50));
+    const cur = visitFilter.value.offset / (visitFilter.value.limit || 50);
+    if (cur + 1 < totalPages) { visitFilter.value.offset += (visitFilter.value.limit || 50); loadVisits(); }
+  } else {
+    const totalPages = Math.ceil(visitorTotal.value / 200);
+    const cur = visitorFilterOffset.value / 200;
+    if (cur + 1 < totalPages) { visitorFilterOffset.value += 200; loadVisitors(); }
+  }
+}
+function prevPage(mode: 'visitors' | 'pageviews') {
+  if (mode === 'pageviews') {
+    if (visitFilter.value.offset >= (visitFilter.value.limit || 50)) { visitFilter.value.offset -= (visitFilter.value.limit || 50); loadVisits(); }
+  } else {
+    if (visitorFilterOffset.value >= 200) { visitorFilterOffset.value -= 200; loadVisitors(); }
+  }
+}
+function goPage(mode: 'visitors' | 'pageviews', n: number) {
+  if (mode === 'pageviews') {
+    visitFilter.value.offset = n * (visitFilter.value.limit || 50); loadVisits();
+  } else {
+    visitorFilterOffset.value = n * 200; loadVisitors();
+  }
+}
+function pageCount(mode: 'visitors' | 'pageviews') {
+  if (mode === 'pageviews') return Math.ceil(visitTotal.value / (visitFilter.value.limit || 50));
+  return Math.ceil(visitorTotal.value / 200);
+}
+function currentPage(mode: 'visitors' | 'pageviews') {
+  if (mode === 'pageviews') return Math.floor(visitFilter.value.offset / (visitFilter.value.limit || 50));
+  return Math.floor(visitorFilterOffset.value / 200);
+}
+
+// 页面浏览记录点击查看 UA
+const showPvDetail = ref(false);
+const selectedPv = ref<any>(null);
+function openPvDetail(v: any) {
+  selectedPv.value = v;
+  showPvDetail.value = true;
+}
+function closePvDetail() {
+  showPvDetail.value = false;
+  selectedPv.value = null;
 }
 
 async function cleanupVisits(days: number | 'all') {
@@ -506,6 +557,17 @@ watch(() => route.query.refresh, () => {
               </tr>
             </tbody>
           </table>
+          <!-- 访客分页 -->
+          <div class="pagination" v-if="pageCount('visitors') > 1">
+            <button :disabled="currentPage('visitors') === 0" @click="prevPage('visitors')">‹ 上一页</button>
+            <template v-for="p in pageCount('visitors')" :key="p">
+              <button v-if="Math.abs(p - 1 - currentPage('visitors')) <= 2 || p === 1 || p === pageCount('visitors')"
+                :class="['page-num', { active: p - 1 === currentPage('visitors') }]"
+                @click="goPage('visitors', p - 1)">{{ p }}</button>
+              <span v-else-if="p === 2 || p === pageCount('visitors') - 1">…</span>
+            </template>
+            <button :disabled="currentPage('visitors') >= pageCount('visitors') - 1" @click="nextPage('visitors')">下一页 ›</button>
+          </div>
         </div>
 
         <!-- 浏览记录视图 -->
@@ -529,7 +591,7 @@ watch(() => route.query.refresh, () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="v in visitList" :key="v.id">
+              <tr v-for="v in visitList" :key="v.id" class="pv-row" @click="openPvDetail(v)">
                 <td class="cell-time">{{ formatVisitTime(v.visit_time) }}</td>
                 <td class="cell-path"><code>{{ v.path }}</code></td>
                 <td class="cell-ip">{{ v.ip || '-' }}</td>
@@ -550,13 +612,48 @@ watch(() => route.query.refresh, () => {
                   <span v-if="v.referer">{{ new URL(v.referer).hostname }}</span>
                   <span v-else>直接访问</span>
                 </td>
-                <td><button class="btn-delete-sm" @click="deleteVisit(v.id)">删除</button></td>
+                <td @click.stop><button class="btn-delete-sm" @click="deleteVisit(v.id)">删除</button></td>
               </tr>
             </tbody>
           </table>
+          <!-- 浏览记录分页 -->
+          <div class="pagination" v-if="pageCount('pageviews') > 1">
+            <button :disabled="currentPage('pageviews') === 0" @click="prevPage('pageviews')">‹ 上一页</button>
+            <template v-for="p in pageCount('pageviews')" :key="p">
+              <button v-if="Math.abs(p - 1 - currentPage('pageviews')) <= 2 || p === 1 || p === pageCount('pageviews')"
+                :class="['page-num', { active: p - 1 === currentPage('pageviews') }]"
+                @click="goPage('pageviews', p - 1)">{{ p }}</button>
+              <span v-else-if="p === 2 || p === pageCount('pageviews') - 1">…</span>
+            </template>
+            <button :disabled="currentPage('pageviews') >= pageCount('pageviews') - 1" @click="nextPage('pageviews')">下一页 ›</button>
+          </div>
         </div>
       </div>
     </section>
+
+    <!-- 浏览记录详情弹窗 -->
+    <div v-if="showPvDetail" class="modal-overlay" @click="closePvDetail">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>浏览记录详情</h3>
+          <button @click="closePvDetail">×</button>
+        </div>
+        <div class="modal-body" v-if="selectedPv">
+          <div class="detail-row"><span class="label">时间:</span><span>{{ formatVisitTime(selectedPv.visit_time) }}</span></div>
+          <div class="detail-row"><span class="label">路径:</span><span><code>{{ selectedPv.path }}</code></span></div>
+          <div class="detail-row"><span class="label">IP:</span><span>{{ selectedPv.ip }}</span></div>
+          <div class="detail-row" v-if="selectedPv.country"><span class="label">位置:</span><span>{{ selectedPv.country }}{{ selectedPv.region ? ' · ' + selectedPv.region : '' }}{{ selectedPv.city ? ' · ' + selectedPv.city : '' }}</span></div>
+          <div class="detail-row"><span class="label">浏览器:</span><span>{{ selectedPv.browser }} {{ selectedPv.browser_version }}</span></div>
+          <div class="detail-row"><span class="label">操作系统:</span><span>{{ selectedPv.os || '-' }}</span></div>
+          <div class="detail-row"><span class="label">设备:</span><span>{{ deviceIcon(selectedPv.device_type) }} {{ selectedPv.device_type || 'desktop' }} {{ selectedPv.device_vendor || '' }} {{ selectedPv.device_model || '' }}</span></div>
+          <div class="detail-row"><span class="label">语言:</span><span>{{ selectedPv.language || '-' }}</span></div>
+          <div class="detail-row"><span class="label">分辨率:</span><span>{{ selectedPv.screen_resolution || '-' }}</span></div>
+          <div class="detail-row"><span class="label">来源:</span><span>{{ selectedPv.referer ? new URL(selectedPv.referer).hostname : '直接访问' }}</span></div>
+          <div class="detail-row" v-if="selectedPv.suspicious"><span class="label">⚠️ 可疑:</span><span style="color:#856404">{{ selectedPv.suspicious }}</span></div>
+          <div class="detail-row"><span class="label">UA:</span><span class="ua-text">{{ selectedPv.user_agent }}</span></div>
+        </div>
+      </div>
+    </div>
 
     <!-- 访客详情弹窗 -->
     <div v-if="showVisitorModal" class="modal-overlay" @click="closeVisitorModal">
@@ -746,6 +843,15 @@ watch(() => route.query.refresh, () => {
 .btn-primary-sm:hover { background: #357abd; }
 .visitor-row { cursor: pointer; transition: background .15s; }
 .visitor-row:hover { background: #f0f7ff !important; }
+.pv-row { cursor: pointer; }
+.pv-row:hover { background: #f5fafe !important; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 16px; flex-wrap: wrap; }
+.pagination button { min-width: 32px; height: 32px; border: 1px solid #d0d5dd; border-radius: 6px; background: #fff; color: #333; font-size: 13px; cursor: pointer; padding: 0 8px; }
+.pagination button:hover:not(:disabled) { background: #f0f7ff; border-color: #1a6b4a; color: #1a6b4a; }
+.pagination button:disabled { opacity: .4; cursor: not-allowed; }
+.pagination button.active { background: #1a6b4a; color: #fff; border-color: #1a6b4a; }
+.pagination .page-num { font-weight: 500; }
+.pagination span { color: #999; padding: 0 4px; }
 
 .btn-primary, .btn-secondary, .btn-tool, .btn-delete {
   padding: 7px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s;
