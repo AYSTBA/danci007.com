@@ -262,6 +262,10 @@ function deviceIcon(type: string) {
   return '💻';
 }
 
+function safeHostname(url: string) {
+  try { return new URL(url).hostname; } catch { return url; }
+}
+
 function formatVisitTime(t: string) {
   if (!t) return '';
   const d = new Date(t.includes('Z') || t.includes('+') ? t : t.replace(' ', 'T') + 'Z');
@@ -609,7 +613,7 @@ watch(() => route.query.refresh, () => {
                 <td>{{ v.language || '-' }}</td>
                 <td>{{ v.screen_resolution || '-' }}</td>
                 <td class="cell-referer" :title="v.referer">
-                  <span v-if="v.referer">{{ new URL(v.referer).hostname }}</span>
+                  <span v-if="v.referer">{{ safeHostname(v.referer) }}</span>
                   <span v-else>直接访问</span>
                 </td>
                 <td @click.stop><button class="btn-delete-sm" @click="deleteVisit(v.id)">删除</button></td>
@@ -648,7 +652,7 @@ watch(() => route.query.refresh, () => {
           <div class="detail-row"><span class="label">设备:</span><span>{{ deviceIcon(selectedPv.device_type) }} {{ selectedPv.device_type || 'desktop' }} {{ selectedPv.device_vendor || '' }} {{ selectedPv.device_model || '' }}</span></div>
           <div class="detail-row"><span class="label">语言:</span><span>{{ selectedPv.language || '-' }}</span></div>
           <div class="detail-row"><span class="label">分辨率:</span><span>{{ selectedPv.screen_resolution || '-' }}</span></div>
-          <div class="detail-row"><span class="label">来源:</span><span>{{ selectedPv.referer ? new URL(selectedPv.referer).hostname : '直接访问' }}</span></div>
+          <div class="detail-row"><span class="label">来源:</span><span>{{ selectedPv.referer ? safeHostname(selectedPv.referer) : '直接访问' }}</span></div>
           <div class="detail-row" v-if="selectedPv.suspicious"><span class="label">⚠️ 可疑:</span><span style="color:#856404">{{ selectedPv.suspicious }}</span></div>
           <div class="detail-row"><span class="label">UA:</span><span class="ua-text">{{ selectedPv.user_agent }}</span></div>
         </div>
@@ -690,7 +694,7 @@ watch(() => route.query.refresh, () => {
                 <td class="cell-time" style="white-space:nowrap">{{ formatVisitTime(pv.visit_time) }}</td>
                 <td class="cell-path"><code>{{ pv.path }}</code></td>
                 <td class="cell-referer" :title="pv.referer">
-                  <span v-if="pv.referer">{{ new URL(pv.referer).hostname }}</span>
+                  <span v-if="pv.referer">{{ safeHostname(pv.referer) }}</span>
                   <span v-else style="color:#999">直接访问</span>
                 </td>
               </tr>
