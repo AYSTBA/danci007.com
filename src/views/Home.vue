@@ -544,7 +544,7 @@ const siteTitle = computed(() => {
 .hero-banner {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
+  height: 620px;
   background: #e8e8e8;
   border-radius: 20px;
   overflow: hidden;
@@ -1017,6 +1017,9 @@ const siteTitle = computed(() => {
   }
 
   .hero-banner {
+    height: 56vw;
+    min-height: 200px;
+    max-height: 300px;
     border-radius: 16px;
     touch-action: pan-y;
   }
@@ -1295,6 +1298,9 @@ const siteTitle = computed(() => {
    ══════════════════════════════════════════════ */
 @media (max-width: 480px) {
   .hero-banner {
+    height: 52vw;
+    min-height: 170px;
+    max-height: 240px;
     border-radius: 14px;
   }
 
