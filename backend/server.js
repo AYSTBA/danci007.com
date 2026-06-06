@@ -150,8 +150,8 @@ app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
     }
     // 过滤: 常见爬虫/机器人
     const ua = req.headers['user-agent'] || '';
-    if (/bot|spider|crawl|slurp|baiduspider|bingpreview|facebookexternalhit|headlesschrome/i.test(ua)) {
-      return res.json({ success: true, ignored: true, reason: 'bot' });
+    if (/bot|spider|crawl|slurp|baiduspider|bingpreview|facebookexternalhit|headlesschrome|windowspowershell|curl\/|wget|python-requests|python-urllib|httpie|postman|node-fetch|axios|insomnia/i.test(ua)) {
+      return res.json({ success: true, ignored: true, reason: 'bot_or_tool' });
     }
     const ip = getClientIp(req);
     const parser = new UAParser(ua);
