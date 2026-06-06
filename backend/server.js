@@ -143,8 +143,17 @@ async function lookupGeo(ip) {
 app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
   try {
     const { path: visitPath = '/', screen_resolution = '', language = '', referer = '' } = req.body || {};
-    const ip = getClientIp(req);
+    // 过滤: 内部路径不计入访客分析
+    const p = String(visitPath || '/');
+    if (p.startsWith('/admin') || p.startsWith('/api') || p.startsWith('/login') || p.startsWith('/account')) {
+      return res.json({ success: true, ignored: true });
+    }
+    // 过滤: 常见爬虫/机器人
     const ua = req.headers['user-agent'] || '';
+    if (/bot|spider|crawl|slurp|baiduspider|bingpreview|facebookexternalhit|headlesschrome/i.test(ua)) {
+      return res.json({ success: true, ignored: true, reason: 'bot' });
+    }
+    const ip = getClientIp(req);
     const parser = new UAParser(ua);
     const uaResult = parser.getResult();
     const browser = uaResult.browser;
@@ -159,7 +168,7 @@ app.post('/api/visit', express.json({ limit: '2kb' }), async (req, res) => {
             (path, ip, country, region, city, user_agent, browser, browser_version, os, device_type, device_vendor, device_model, referer, language, screen_resolution)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
-          String(visitPath).slice(0, 200),
+          p.slice(0, 200),
           ip,
           geo.country, geo.region, geo.city,
           ua.slice(0, 500),
