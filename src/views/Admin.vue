@@ -1,9 +1,12 @@
 ﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import ImageEditor from '../components/ImageEditor.vue';
 import type { BookingData, Banner, Teacher, PageContents } from '../types';
 import { normalizeActive } from '../types';
 import { getImageUrl, formatDate, fetchJson } from '../utils';
+
+const router = useRouter();
 
 const teachers = ref<Teacher[]>([]);
 const isLoggedIn = ref(false);
