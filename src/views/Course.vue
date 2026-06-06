@@ -10,6 +10,15 @@ const router = useRouter();
 const hasId = computed(() => !!route.params.id);
 const courseId = computed(() => (route.params.id as string) || '');
 
+// 返回: 有历史则 history.back(), 否则回首页
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back();
+  } else {
+    router.push('/');
+  }
+};
+
 // ── 共享 composables ──
 const { currentLang, showLangDropdown, toggleLanguage, selectLanguage } = useLanguage();
 const isZh = computed(() => currentLang.value === 'zh');
@@ -223,6 +232,9 @@ onMounted(() => {
     <template v-if="!hasId">
       <header class="top-bar">
         <div class="top-left">
+          <button class="back-btn" @click="goBack" :title="t('返回', 'Back')">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
           <span class="top-title">{{ t('课程中心', 'Courses') }}</span>
         </div>
         <div class="top-right">
@@ -329,7 +341,7 @@ onMounted(() => {
       <template v-else-if="course">
         <header class="top-bar">
           <div class="top-left">
-            <button class="back-btn" @click="router.push('/course')" :title="t('返回课程列表', 'Back')">
+            <button class="back-btn" @click="goBack" :title="t('返回', 'Back')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <span class="top-title">{{ t(course.name, course.name_en) }}</span>

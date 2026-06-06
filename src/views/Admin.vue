@@ -695,8 +695,10 @@ const handleEditorCancel = () => {
 
 // ── 访客分析 ──
 async function loadVisitStats() {
-  const res = await fetchJson('/api/admin/visits/stats');
-  if (res) visitStats.value = res;
+  try {
+    const res = await fetchJson('/api/admin/visits/stats', { headers: getAuthHeaders() });
+    if (res) visitStats.value = res;
+  } catch (e) { console.error('loadVisitStats failed:', e); }
 }
 
 async function loadVisits() {
@@ -705,14 +707,13 @@ async function loadVisits() {
     const f = visitFilter.value;
     const params = new URLSearchParams();
     Object.entries(f).forEach(([k, v]) => { if (v !== '' && v !== null && v !== undefined) params.set(k, String(v)); });
-    const res = await fetchJson('/api/admin/visits?' + params.toString());
+    const res = await fetchJson('/api/admin/visits?' + params.toString(), { headers: getAuthHeaders() });
     if (res) {
       visitList.value = res.rows || [];
       visitTotal.value = res.total || 0;
     }
-  } finally {
-    visitLoading.value = false;
-  }
+  } catch (e) { console.error('loadVisits failed:', e); }
+  finally { visitLoading.value = false; }
 }
 
 function switchTab(name: string) {
@@ -725,7 +726,7 @@ function switchTab(name: string) {
 
 async function deleteVisit(id: number) {
   if (!confirm('确定删除这条访问记录吗？')) return;
-  const res = await fetchJson('/api/admin/visits/' + id, { method: 'DELETE' });
+  const res = await fetchJson('/api/admin/visits/' + id, { method: 'DELETE', headers: getAuthHeaders() });
   if (res && (res as any).success) {
     visitList.value = visitList.value.filter(v => v.id !== id);
     visitTotal.value = Math.max(0, visitTotal.value - 1);
@@ -737,7 +738,7 @@ async function cleanupVisits(days: number | 'all') {
   const msg = days === 'all' ? '确定清空所有访客记录吗？此操作不可恢复！' : `确定删除 ${days} 天前的所有访客记录吗？`;
   if (!confirm(msg)) return;
   const body = days === 'all' ? { all: true } : { olderThanDays: days };
-  const res = await fetchJson('/api/admin/visits', { method: 'DELETE', body: JSON.stringify(body) });
+  const res = await fetchJson('/api/admin/visits', { method: 'DELETE', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (res && (res as any).success) {
     alert(`已清理 ${(res as any).deleted} 条记录`);
     loadVisitStats();
