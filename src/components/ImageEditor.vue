@@ -320,22 +320,22 @@ const confirmCrop = () => {
       
       circleCanvas.toBlob((blob) => {
         if (blob) {
-          const fileName = (props.imageFile as File)?.name || 'cropped-image.png';
-          const newFile = new File([blob], fileName, { type: 'image/png' });
+          const fileName = (props.imageFile as File)?.name?.replace(/\.[^.]+$/, '') || 'cropped-image';
+          const newFile = new File([blob], fileName + '.jpg', { type: 'image/jpeg' });
           emit('confirm', newFile);
         }
-      }, 'image/png');
+      }, 'image/jpeg', 0.92);
       return;
     }
   }
   
   tempCanvas.toBlob((blob) => {
     if (blob) {
-      const fileName = (props.imageFile as File)?.name || 'cropped-image.png';
-      const newFile = new File([blob], fileName, { type: 'image/png' });
+      const fileName = (props.imageFile as File)?.name?.replace(/\.[^.]+$/, '') || 'cropped-image';
+      const newFile = new File([blob], fileName + '.jpg', { type: 'image/jpeg' });
       emit('confirm', newFile);
     }
-  }, 'image/png');
+  }, 'image/jpeg', 0.92);
 };
 
 const cancel = () => {

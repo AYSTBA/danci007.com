@@ -436,7 +436,7 @@ for (const dir of [uploadDir, dataDir]) {
 app.use('/uploads', express.static(uploadDir));
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
 const dbPath = path.join(dataDir, 'danci007.db');
 const db = new Database(dbPath);
