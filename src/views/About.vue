@@ -286,9 +286,7 @@ onUnmounted(stopBannerAutoPlay)
 .banner-slider {
   position: relative;
   width: 100%;
-  height: 56vw;
-  max-height: 300px;
-  min-height: 200px;
+  aspect-ratio: 21/9;
   background: #e8e8e8;
   border-radius: 16px;
   overflow: hidden;
@@ -551,9 +549,6 @@ onUnmounted(stopBannerAutoPlay)
   }
 
   .banner-slider {
-    height: 420px;
-    max-height: none;
-    min-height: 300px;
     border-radius: 20px;
   }
 
@@ -630,7 +625,7 @@ onUnmounted(stopBannerAutoPlay)
 }
 
 @media (min-width: 1024px) {
-  .banner-slider { height: 500px; }
+  .banner-slider { border-radius: 24px; }
 
   .intro-text h2 { font-size: 36px; }
 
