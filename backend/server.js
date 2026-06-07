@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
+import os from 'os';
+import { exec } from 'child_process';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -415,6 +417,76 @@ app.delete('/api/admin/visits', requireAdminAuth, (req, res) => {
 app.delete('/api/admin/visits/:id', requireAdminAuth, (req, res) => {
   const r = db.prepare('DELETE FROM page_visits WHERE id = ?').run(Number(req.params.id));
   res.json({ success: true, deleted: r.changes });
+});
+
+// ── 服务器运行面板 API ──
+app.get('/api/admin/server-stats', requireAdminAuth, async (req, res) => {
+  try {
+    const cpus = os.cpus();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const loadAvg = os.loadavg();
+
+    let diskInfo = { total: 0, used: 0, free: 0 };
+    let gpuInfo = null;
+    try {
+      const diskOut = await new Promise((r) => exec('df -k /', (e, o) => r(e ? '' : o)));
+      if (diskOut) {
+        const parts = diskOut.trim().split('\n').pop().split(/\s+/);
+        if (parts.length >= 4) {
+          diskInfo = { total: parseInt(parts[1]) * 1024, used: parseInt(parts[2]) * 1024, free: parseInt(parts[3]) * 1024 };
+        }
+      }
+    } catch {}
+    try {
+      const gpuOut = await new Promise((r) => exec("nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits 2>/dev/null", (e, o) => r(e ? '' : o)));
+      if (gpuOut) {
+        const line = gpuOut.trim().split('\n')[0];
+        if (line) {
+          const parts = line.split(',').map(s => s.trim());
+          gpuInfo = { name: parts[0] || '', memTotal: parseInt(parts[1]) || 0, memUsed: parseInt(parts[2]) || 0, memFree: parseInt(parts[3]) || 0, util: parseInt(parts[4]) || 0 };
+        }
+      }
+    } catch {}
+
+    const dbPath = path.join(dataDir, 'danci007.db');
+    let dbSize = 0;
+    try { dbSize = statSync(dbPath).size; } catch {}
+    const uploadFiles = [];
+    let uploadSize = 0;
+    try {
+      const files = readdirSync(uploadDir).filter(f => !f.startsWith('.'));
+      for (const f of files) {
+        try { const s = statSync(path.join(uploadDir, f)); uploadSize += s.size; uploadFiles.push(f); } catch {}
+      }
+    } catch {}
+    const visitCount = db.prepare('SELECT COUNT(*) as c FROM page_visits').get().c;
+    const bookingCount = db.prepare('SELECT COUNT(*) as c FROM bookings').get().c;
+    const siteName = db.prepare("SELECT value FROM page_contents WHERE key='site_name'").get()?.value || '';
+
+    res.json({
+      server: {
+        hostname: os.hostname(), platform: os.platform(), arch: os.arch(),
+        release: os.release(), uptime: os.uptime(),
+        nodeVersion: process.version, processUptime: process.uptime(),
+        processMemory: process.memoryUsage().rss,
+        cpuModel: cpus[0]?.model || '', cpuCores: cpus.length,
+        loadAvg: { m1: loadAvg[0], m5: loadAvg[1], m15: loadAvg[2] },
+        memTotal: totalMem, memUsed: usedMem, memFree: freeMem, memUsagePercent: totalMem ? Math.round(usedMem / totalMem * 100) : 0,
+        diskTotal: diskInfo.total, diskUsed: diskInfo.used, diskFree: diskInfo.free,
+        diskUsagePercent: diskInfo.total ? Math.round(diskInfo.used / diskInfo.total * 100) : 0,
+        gpu: gpuInfo,
+      },
+      website: {
+        dbSize, uploadCount: uploadFiles.length, uploadSize,
+        visitCount, bookingCount, siteName,
+        serverTime: new Date().toISOString(),
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // 生产环境：服务 Vite 构建输出的静态文件

@@ -774,6 +774,7 @@ onMounted(() => {
             <button :class="['tab', { active: activeTab === 'reviews' }]" @click="activeTab = 'reviews'">课程评价</button>
             <button :class="['tab', { active: activeTab === 'interactions' }]" @click="activeTab = 'interactions'">课程互动</button>
             <button class="tab tab-nav" @click="router.push('/admin/visits')">📊 访客分析</button>
+            <button class="tab tab-nav" @click="router.push('/admin/server')">🖥 服务器</button>
           </div>
 
           <!-- Banners Tab -->

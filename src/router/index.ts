@@ -28,6 +28,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/AdminVisits.vue')
   },
   {
+    path: '/admin/server',
+    name: 'AdminServer',
+    component: () => import('../views/AdminServer.vue')
+  },
+  {
     path: '/course',
     name: 'CourseList',
     component: () => import('../views/Course.vue')
