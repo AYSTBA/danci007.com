@@ -492,7 +492,15 @@ app.get('/api/admin/server-stats', requireAdminAuth, async (req, res) => {
 // 生产环境：服务 Vite 构建输出的静态文件
 const distDir = path.join(__dirname, '..', 'dist');
 if (existsSync(distDir)) {
-  app.use(express.static(distDir));
+  app.use(express.static(distDir, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
   console.log('Serving static files from:', distDir);
 }
 
@@ -1141,6 +1149,7 @@ const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
 if (existsSync(distDir) && existsSync(indexPath)) {
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(indexPath);
     }
   });
