@@ -1,6 +1,7 @@
 # 单词突击007 - API 文档
 
-**Base URL:** `http://localhost:3001`  
+**Base URL (生产):** `https://zxsz007.cn`  
+**Base URL (开发):** `http://localhost:3001`  
 **Content-Type:** `application/json` (除了文件上传)
 
 ---
@@ -774,6 +775,216 @@ x-admin-token: <your-token>
 
 ---
 
+## 📊 访客分析 API
+
+### 获取统计概览（管理员）
+
+**GET** `/api/admin/visits/stats`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**响应：**
+```json
+{
+  "total": 1234,
+  "today": 56,
+  "week": 345,
+  "month": 890,
+  "uniqueIps": 120,
+  "uniqueToday": 8,
+  "uniqueVisitors": 150,
+  "uniqueVisitorsToday": 10,
+  "topPaths": [{"path": "/", "c": 500}],
+  "topBrowsers": [{"name": "Chrome", "c": 600}],
+  "topOs": [{"name": "Windows 10", "c": 400}],
+  "deviceDist": [{"name": "desktop", "c": 800}],
+  "topCountries": [{"country":"中国","region":"广东","city":"深圳","c":200}],
+  "hourly": [{"hour":"09","c":15}]
+}
+```
+
+---
+
+### 查询访客记录（管理员）
+
+**GET** `/api/admin/visits`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**查询参数（可选）：**
+- `limit` - 每页条数（默认 100，最大 1000）
+- `offset` - 偏移量
+- `ip` - 按 IP 模糊搜索
+- `browser` - 按浏览器搜索
+- `os` - 按系统搜索
+- `device` - 按设备类型（desktop/mobile/tablet）
+- `path` - 按页面路径
+- `since` / `until` - 时间范围
+
+**响应：**
+```json
+{
+  "rows": [{ "id": 1, "path": "/", "ip": "1.2.3.4", "country": "中国", "browser": "Chrome", "os": "Windows 10", "visit_time": "2026-06-07 12:00:00" }],
+  "total": 1234,
+  "limit": 100,
+  "offset": 0
+}
+```
+
+---
+
+### 独立访客列表（管理员）
+
+**GET** `/api/admin/visitors`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**查询参数（可选）：** `limit`, `offset`, `since`, `until`
+
+**响应：**
+```json
+{
+  "visitors": [
+    {
+      "ip": "1.2.3.4",
+      "country": "中国",
+      "browser": "Chrome",
+      "os": "Windows 10",
+      "device_type": "desktop",
+      "pageview_count": 25,
+      "unique_paths": 5,
+      "first_visit": "2026-06-01 10:00:00",
+      "last_visit": "2026-06-07 12:00:00"
+    }
+  ],
+  "total": 150
+}
+```
+
+---
+
+### 删除访客记录（管理员）
+
+**DELETE** `/api/admin/visits`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**请求体：**
+```json
+{ "olderThanDays": 30 }
+```
+或删除全部：`{ "all": true }`
+
+---
+
+## 🖥 服务器监控 API
+
+### 获取服务器运行状态（管理员）
+
+**GET** `/api/admin/server-stats`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**响应：**
+```json
+{
+  "server": {
+    "hostname": "vps-xxxx",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "5.15.0",
+    "uptime": 123456,
+    "nodeVersion": "v20.19.0",
+    "processUptime": 3600,
+    "processMemory": 52428800,
+    "cpuModel": "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz",
+    "cpuCores": 4,
+    "loadAvg": { "m1": 0.5, "m5": 0.3, "m15": 0.2 },
+    "memTotal": 8589934592,
+    "memUsed": 4294967296,
+    "memFree": 4294967296,
+    "memUsagePercent": 50,
+    "diskTotal": 107374182400,
+    "diskUsed": 53687091200,
+    "diskFree": 53687091200,
+    "diskUsagePercent": 50,
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memTotal": 24564,
+      "memUsed": 4096,
+      "memFree": 20468,
+      "util": 15
+    }
+  },
+  "website": {
+    "dbSize": 1048576,
+    "uploadCount": 42,
+    "uploadSize": 209715200,
+    "visitCount": 1234,
+    "bookingCount": 56,
+    "siteName": "中萱文化",
+    "serverTime": "2026-06-07T12:00:00.000Z"
+  }
+}
+```
+
+> **注意：** `gpu` 仅在服务器有 NVIDIA 显卡且安装了 nvidia-smi 时返回。`disk` 使用 `df -k /` 获取根分区数据。
+
+---
+
+## 🗑 孤儿文件清理 API
+
+### 列出未引用的上传文件（管理员）
+
+**GET** `/api/admin/orphan-uploads`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+```
+
+**响应：**
+```json
+{
+  "orphans": ["1717452000000-123456789.webp"],
+  "count": 1,
+  "totalSize": 102400
+}
+```
+
+---
+
+### 删除未引用的上传文件（管理员）
+
+**POST** `/api/admin/orphan-uploads`
+
+**请求头：**
+```
+x-admin-token: <your-token>
+Content-Type: application/json
+```
+
+**请求体：**
+```json
+{ "olderThanHours": 24 }
+```
+或指定文件：`{ "paths": ["file1.webp"] }`
+
 ## 🤖 Agent 集成示例
 
 ### Python 示例
@@ -781,7 +992,7 @@ x-admin-token: <your-token>
 ```python
 import requests
 
-BASE_URL = "http://localhost:3001"
+BASE_URL = "https://zxsz007.cn"
 
 # 1. 登录获取 token
 def login(password="your_password"):
@@ -842,7 +1053,7 @@ if __name__ == "__main__":
 ```javascript
 const axios = require('axios');
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = 'https://zxsz007.cn';
 
 // 1. 登录获取 token
 async function login(password = 'your_password') {
@@ -909,9 +1120,9 @@ async function submitBooking(name, phone, date, time, course) {
 
 - **前端地址：<ADDRESS_REMOVED>
 - **管理后台：<ADDRESS_REMOVED>
-- **GitHub 仓库：** https://github.com/AYSTBA/danci007web
+- **GitHub 仓库：** https://github.com/AYSTBA/danci007.com
 
 ---
 
-**文档版本：** 1.0.0  
-**最后更新：** 2026-06-03
+**文档版本：** 1.1.0  
+**最后更新：** 2026-06-07
