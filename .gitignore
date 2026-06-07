@@ -2,8 +2,8 @@
 node_modules/
 backend/node_modules/
 
-# Build outputs (服务器上重新构建)
-dist/
+# Build outputs (提交到 git 供服务器使用，无需服务器构建)
+# dist/
 build/
 out/
 
