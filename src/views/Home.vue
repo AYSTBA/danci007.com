@@ -877,9 +877,11 @@ const siteTitle = computed(() => {
 .why-content {
   width: 100%;
   padding: 60px 80px;
-  border: 2px dashed #ddd;
-  border-radius: 20px;
-  background: white;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
 }
 
 .section-title {
@@ -961,13 +963,15 @@ const siteTitle = computed(() => {
 }
 
 .teacher-card {
-  background: #fafafa;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
   border-radius: 20px;
   padding: 30px;
   text-align: center;
   box-shadow: 0 10px 40px rgba(0,0,0,0.06);
   transition: transform 0.3s, box-shadow 0.3s;
-  border: 1px solid #f0f0f0;
 }
 
 .teacher-card:hover {
@@ -1050,7 +1054,7 @@ const siteTitle = computed(() => {
   padding: 48px 40px 32px;
   text-align: center;
   border-top: none;
-  background: linear-gradient(to top, rgba(76, 175, 80, 0.92), rgba(102, 187, 106, 0.45), transparent);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
