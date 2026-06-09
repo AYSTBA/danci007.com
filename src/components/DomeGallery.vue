@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
   minRadius: 600,
   maxRadius: Infinity,
   padFactor: 0.25,
-  overlayBlurColor: '#120F17',
+  overlayBlurColor: 'transparent',
   maxVerticalRotationDeg: 5,
   dragSensitivity: 20,
   enlargeTransitionMs: 300,
@@ -599,12 +599,12 @@ main.sphere-main {
 }
 
 .overlay {
-  background-image: radial-gradient(rgba(235, 235, 235, 0) 65%, var(--overlay-blur-color, #120F17) 100%);
+  background-image: radial-gradient(rgba(255, 255, 255, 0) 65%, var(--overlay-blur-color, transparent) 100%);
 }
 
 .overlay--blur {
-  -webkit-mask-image: radial-gradient(rgba(235, 235, 235, 0) 70%, var(--overlay-blur-color, #120F17) 90%);
-  mask-image: radial-gradient(rgba(235, 235, 235, 0) 70%, var(--overlay-blur-color, #120F17) 90%);
+  -webkit-mask-image: radial-gradient(rgba(255, 255, 255, 0) 70%, var(--overlay-blur-color, transparent) 90%);
+  mask-image: radial-gradient(rgba(255, 255, 255, 0) 70%, var(--overlay-blur-color, transparent) 90%);
   backdrop-filter: blur(3px);
 }
 
@@ -724,7 +724,7 @@ main.sphere-main {
   height: 120px;
   z-index: 5;
   pointer-events: none;
-  background: linear-gradient(to bottom, transparent, var(--overlay-blur-color, #120F17));
+  background: linear-gradient(to bottom, transparent, var(--overlay-blur-color, transparent));
 }
 
 .edge-fade--top {
