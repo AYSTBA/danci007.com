@@ -1137,7 +1137,10 @@ const siteTitle = computed(() => {
     padding-top: 0;
     min-height: auto;
     padding-bottom: 24px;
+    display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
 
   .hero-inner { padding: 0 16px; justify-content: center; }
