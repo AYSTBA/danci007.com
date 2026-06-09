@@ -493,6 +493,7 @@ const siteTitle = computed(() => {
             :images="galleryPhotos.map(p => p.url)"
             :fit="0.5"
             :min-radius="domeMinRadius"
+            :image-border-radius="isMobile ? '10px' : '30px'"
             :max-vertical-rotation-deg="9"
             :segments="20"
             :drag-dampening="3.8"
