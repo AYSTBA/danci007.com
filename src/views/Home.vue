@@ -250,11 +250,44 @@ function initAnimations() {
         );
       }
     } else {
-      // Mobile: simpler fade-in
-      gsap.set(curtainRef.value, { y: '-100%' });
-      if (heroTitleRef.value) gsap.set(heroTitleRef.value, { opacity: 1, scaleX: 1, scaleY: 1, y: 0 });
-      if (heroSubRef.value) gsap.set(heroSubRef.value, { opacity: 1, y: 0 });
-      if (heroRef.value) gsap.set(heroRef.value.querySelector('.hero-banner-wrapper'), { opacity: 1, scale: 1 });
+      // Mobile: animate curtain then show content
+      if (curtainRef.value) {
+        tl.to(curtainRef.value, {
+          y: '-100%',
+          duration: 1.2,
+          ease: 'power4.inOut',
+        });
+      }
+      if (heroTitleRef.value) {
+        tl.fromTo(heroTitleRef.value,
+          { scaleX: 0.6, scaleY: 1.4, y: 40, opacity: 0 },
+          { scaleX: 1, scaleY: 1, y: 0, opacity: 1, duration: 1, ease: 'power4.out' },
+          '-=0.6'
+        );
+      }
+      if (heroSubRef.value) {
+        tl.fromTo(heroSubRef.value,
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.7, ease: 'power2.out' },
+          '-=0.4'
+        );
+      }
+      if (heroRef.value) {
+        tl.fromTo(heroRef.value.querySelector('.hero-banner-wrapper'),
+          { opacity: 0, scale: 0.95 },
+          { opacity: 1, scale: 1, duration: 1, ease: 'power2.out' },
+          '-=0.5'
+        );
+      }
+      // Fade out hero text after banner appears
+      if (heroTextOverlayRef.value) {
+        tl.to(heroTextOverlayRef.value, {
+          opacity: 0,
+          y: -20,
+          duration: 0.5,
+          ease: 'power2.in',
+        }, '-=0.3');
+      }
     }
 
     ScrollTrigger.refresh();
@@ -1080,8 +1113,6 @@ const siteTitle = computed(() => {
    移动端
    ══════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .curtain-overlay { display: none; }
-
   .page-container { padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 8px); }
 
   .header-inner { padding: 12px 16px; padding-top: calc(12px + var(--safe-top)); }
@@ -1091,16 +1122,22 @@ const siteTitle = computed(() => {
   .mobile-nav { display: flex; }
 
   .hero-text-overlay {
-    position: relative;
-    top: auto; left: auto;
-    transform: none;
-    padding: calc(80px + var(--safe-top)) 16px 20px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0 16px;
+    width: 100%;
+    max-width: 100%;
+    text-align: center;
+    pointer-events: none;
   }
 
   .hero-section {
     padding-top: 0;
-    min-height: auto;
-    padding-bottom: 24px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: 0;
     flex-direction: column;
   }
 
