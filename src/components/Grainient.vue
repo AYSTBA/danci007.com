@@ -161,6 +161,7 @@ let raf = 0;
 let t0 = 0;
 let isVisible = true;
 let isPageVisible = true;
+let cleanupFns: (() => void)[] = [];
 
 function build() {
   const container = containerRef.value;
@@ -179,6 +180,7 @@ function build() {
   canvas.style.height = '100%';
   canvas.style.display = 'block';
   container.appendChild(canvas);
+  cleanupFns.push(() => { try { container.removeChild(canvas); } catch { /* ignore */ } });
 
   const geometry = new Triangle(gl);
   program = new Program(gl, {
@@ -226,6 +228,7 @@ function build() {
 
   const ro = new ResizeObserver(setSize);
   ro.observe(container);
+  cleanupFns.push(() => ro.disconnect());
   setSize();
 
   t0 = performance.now();
@@ -251,26 +254,26 @@ function build() {
     { threshold: 0 }
   );
   io.observe(container);
+  cleanupFns.push(() => io.disconnect());
 
   const onVisibility = () => {
     isPageVisible = !document.hidden;
     isPageVisible ? tryStart() : tryStop();
   };
   document.addEventListener('visibilitychange', onVisibility);
+  cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibility));
 
   tryStart();
-
-  onUnmounted(() => {
-    tryStop();
-    ro.disconnect();
-    io.disconnect();
-    document.removeEventListener('visibilitychange', onVisibility);
-    try { container.removeChild(canvas); } catch { /* ignore */ }
-  });
 }
 
 onMounted(() => {
   build();
+});
+
+onUnmounted(() => {
+  if (raf !== 0) { cancelAnimationFrame(raf); raf = 0; }
+  cleanupFns.forEach(fn => fn());
+  cleanupFns = [];
 });
 
 // Watch props and sync to uniforms
