@@ -114,7 +114,8 @@ const curtainRef = ref<HTMLElement | null>(null);
 const shouldAnimate = !sessionStorage.getItem('home_animated');
 
 const isMobile = ref(window.innerWidth < 769);
-const domeMinRadius = computed(() => isMobile.value ? 200 : 600);
+const domeMinRadius = computed(() => isMobile.value ? 100 : 600);
+const domeFit = computed(() => isMobile.value ? 0.3 : 0.5);
 
 let ctx: gsap.Context | null = null;
 
@@ -491,7 +492,7 @@ const siteTitle = computed(() => {
         <div ref="galleryGridRef" class="dome-container">
           <DomeGallery
             :images="galleryPhotos.map(p => p.url)"
-            :fit="0.5"
+            :fit="domeFit"
             :min-radius="domeMinRadius"
             :max-vertical-rotation-deg="9"
             :segments="20"
