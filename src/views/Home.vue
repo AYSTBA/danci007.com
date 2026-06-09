@@ -713,15 +713,15 @@ const siteTitle = computed(() => {
 /* ── Hero text overlay ── */
 .hero-text-overlay {
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 15;
   text-align: center;
   pointer-events: none;
   width: 100%;
   max-width: 900px;
-  padding: 0 40px;
+  padding: 20px 40px;
 }
 
 .hero-main-title {
@@ -746,7 +746,7 @@ const siteTitle = computed(() => {
 
 /* ── Banner 轮播 ── */
 .hero-section {
-  min-height: auto;
+  min-height: 100vh;
   padding-top: 10px;
   display: flex;
   align-items: center;
