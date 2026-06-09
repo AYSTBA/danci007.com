@@ -10,13 +10,8 @@ const router = useRouter();
 const hasId = computed(() => !!route.params.id);
 const courseId = computed(() => (route.params.id as string) || '');
 
-// 返回: 有历史则 history.back(), 否则回首页
 const goBack = () => {
-  if (window.history.length > 1) {
-    router.back();
-  } else {
-    router.push('/');
-  }
+  router.push('/');
 };
 
 // ── 共享 composables ──
