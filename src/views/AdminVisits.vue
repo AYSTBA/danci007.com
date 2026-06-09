@@ -711,9 +711,9 @@ watch(() => route.query.refresh, () => {
 </template>
 
 <style scoped>
-.admin-visits-page { min-height: 100vh; background: #f5f7fa; }
+.admin-visits-page { min-height: 100vh; background: linear-gradient(135deg, #f0faf0 0%, #f5f7fa 50%, #e8f5e9 100%); }
 
-.page-header { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.2rem 0; position: sticky; top: 0; z-index: 100; }
+.page-header { background: rgba(255,255,255,0.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.2rem 0; position: sticky; top: 0; z-index: 100; }
 .page-header .container { max-width: 1400px; margin: 0 auto; padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .header-left { display: flex; align-items: center; gap: 1rem; }
 .header-right { display: flex; align-items: center; gap: 1rem; }
@@ -747,10 +747,12 @@ watch(() => route.query.refresh, () => {
   margin-bottom: 20px;
 }
 .stat-card {
-  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 16px;
   padding: 18px;
-  border: 1px solid #e0e0e0;
   transition: transform .2s;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
@@ -771,9 +773,11 @@ watch(() => route.query.refresh, () => {
   margin-bottom: 20px;
 }
 .dist-block {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 16px;
   padding: 16px;
 }
 .dist-block h4 { margin: 0 0 12px 0; font-size: 15px; color: #333; }
@@ -807,7 +811,7 @@ watch(() => route.query.refresh, () => {
 .subtab:hover { color: #4a90e2; }
 .subtab.active { color: #4a90e2; border-bottom-color: #4a90e2; font-weight: 600; }
 
-.visit-filters { background: #f8f9fa; padding: 14px; border-radius: 8px; margin-bottom: 14px; }
+.visit-filters { background: rgba(255,255,255,0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 14px; border-radius: 12px; margin-bottom: 14px; }
 .filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .filter-row input, .filter-row select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: #fff; }
 .filter-row input { min-width: 110px; }
@@ -816,7 +820,7 @@ watch(() => route.query.refresh, () => {
 .visit-actions { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
 .visit-count { color: #666; font-size: 14px; margin-right: auto; }
 
-.visit-table-wrap { overflow-x: auto; border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; }
+.visit-table-wrap { overflow-x: auto; border: 1px solid rgba(255,255,255,0.7); border-radius: 16px; background: rgba(255,255,255,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .visit-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px; }
 .visit-table th { background: #f8f9fa; padding: 10px 8px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 1; }
 .visit-table td { padding: 9px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }

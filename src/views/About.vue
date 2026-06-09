@@ -222,7 +222,7 @@ onUnmounted(stopBannerAutoPlay)
 <style scoped>
 .about-page {
   min-height: 100vh;
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, #f0faf0 0%, #f5f5f5 50%, #e8f5e9 100%);
 }
 
 /* ── 顶部导航 ── */
@@ -230,8 +230,10 @@ onUnmounted(stopBannerAutoPlay)
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #fff;
-  border-bottom: 0.5px solid var(--border-light);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 0.5px solid rgba(255,255,255,0.6);
 }
 
 .header-inner {
@@ -402,7 +404,7 @@ onUnmounted(stopBannerAutoPlay)
 /* ── 数据统计 ── */
 .stats-section {
   padding: 32px 0;
-  background: #fff;
+  background: transparent;
 }
 
 .section-title {
@@ -422,8 +424,11 @@ onUnmounted(stopBannerAutoPlay)
 .stat-card {
   text-align: center;
   padding: 20px 12px;
-  background: #fafafa;
-  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 16px;
   transition: all 0.3s;
 }
 
@@ -453,10 +458,12 @@ onUnmounted(stopBannerAutoPlay)
 }
 
 .feature-card {
-  background: #fff;
-  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 16px;
   padding: 20px 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   transition: all 0.3s;
 }
 

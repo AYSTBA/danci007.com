@@ -220,7 +220,7 @@ onMounted(checkLogin);
 <style scoped>
 .server-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #f0faf0 0%, #f5f7fa 50%, #e8f5e9 100%);
   font-family: -apple-system, system-ui, sans-serif;
 }
 .login-screen {
@@ -262,7 +262,13 @@ header h1 { font-size: 22px; color: #1a1a2e; margin: 0; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 .card {
-  background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 .card h2 { font-size: 15px; color: #1a1a2e; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid #e94560; }
 table { width: 100%; border-collapse: collapse; }

@@ -1241,10 +1241,10 @@ onMounted(() => {
 
 <style scoped>
 /* Admin 页面样式保持不变，与原版一致 */
-.admin-page { min-height: 100vh; background: #f5f7fa; }
+.admin-page { min-height: 100vh; background: linear-gradient(135deg, #f0faf0 0%, #f5f7fa 50%, #e8f5e9 100%); }
 
 .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
-.login-box { background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
+.login-box { background: rgba(255,255,255,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.7); padding: 3rem; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
 .login-box h2 { margin: 0 0 1rem; color: #333; }
 .login-hint { color: #666; margin-bottom: 1.5rem; }
 .login-box input { width: 100%; padding: 12px; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
@@ -1253,7 +1253,7 @@ onMounted(() => {
 .login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
 .login-box .error { color: #f56c6c; margin-top: 1rem; }
 
-.page-header { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.5rem 0; position: sticky; top: 0; z-index: 100; }
+.page-header { background: rgba(255,255,255,0.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.5rem 0; position: sticky; top: 0; z-index: 100; }
 .page-header .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
 .header-flex { display: flex; justify-content: space-between; align-items: center; }
 .page-header h1 { margin: 0; color: #333; font-size: 1.8rem; }
@@ -1272,9 +1272,9 @@ onMounted(() => {
 .tab:hover { border-color: var(--primary-color); color: var(--primary-color); }
 .tab.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
 
-.tab-content { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+.tab-content { background: rgba(255,255,255,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.7); padding: 2rem; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 .banners-list { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
-.banner-item { border: 1px solid #eee; border-radius: 10px; padding: 1.5rem; background: #fafafa; }
+.banner-item { border: 1px solid rgba(255,255,255,0.7); border-radius: 16px; padding: 1.5rem; background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .banner-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .field-group { display: flex; flex-direction: column; gap: 0.5rem; }
 .field-group.lang-group { grid-column: span 1; }
@@ -1399,12 +1399,12 @@ onMounted(() => {
 .detail-row { display: flex; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #f5f5f5; }
 .detail-row .label { font-weight: 600; color: #333; width: 100px; }
 
-.teachers-settings { margin-bottom: 1.5rem; padding: 1rem; background: #f5f7fa; border-radius: 8px; }
+.teachers-settings { margin-bottom: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.3); border-radius: 12px; }
 .setting-info { display: flex; gap: 2rem; align-items: center; }
 .teacher-count { color: var(--primary-color); font-weight: 500; }
 
 .teachers-list { display: flex; flex-direction: column; gap: 2rem; margin-bottom: 2rem; }
-.teacher-item { border: 1px solid #eee; border-radius: 10px; padding: 1.5rem; background: #fafafa; }
+.teacher-item { border: 1px solid rgba(255,255,255,0.7); border-radius: 16px; padding: 1.5rem; background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
 .teacher-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .avatar-group { grid-column: span 1; }
 .avatar-upload { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }

@@ -583,9 +583,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   padding: 16px 8px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 16px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: all 0.25s;
@@ -628,9 +630,11 @@ onUnmounted(() => {
 }
 
 .form-card {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 16px;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 20px;
   padding: 20px 16px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.06);
 }
@@ -665,12 +669,14 @@ onUnmounted(() => {
 .input {
   width: 100%;
   padding: 12px 14px;
-  border: 2px solid #e8e8e8;
+  border: 2px solid rgba(255,255,255,0.5);
   border-radius: 12px;
   font-size: 16px;
   color: #333;
   outline: none;
-  background: white;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
   min-height: 48px;
@@ -745,9 +751,11 @@ select.input {
 
 /* ── 成功 ── */
 .success-card {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 16px;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 20px;
   padding: 32px 20px;
   text-align: center;
   box-shadow: 0 10px 40px rgba(0,0,0,0.06);
@@ -814,9 +822,11 @@ select.input {
 
 /* ── 营业时间 ── */
 .hours-card {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 16px;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 20px;
   padding: 20px 16px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.06);
 }
@@ -849,16 +859,14 @@ select.input {
   padding: 24px 16px;
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 8px));
   text-align: center;
-  background: linear-gradient(to top, var(--primary-color), var(--primary-lighter));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
 
 .page-footer p {
   font-size: 13px;
-  color: white;
+  color: #555;
   margin: 0;
   font-weight: 500;
 }
@@ -867,11 +875,11 @@ select.input {
   display: block;
   margin-top: 6px;
   font-size: 12px;
-  color: rgba(255,255,255,0.85);
+  color: #999;
   text-decoration: none;
   transition: color 0.2s;
 }
-.page-footer .icp-link:hover { color: white; text-decoration: underline; }
+.page-footer .icp-link:hover { color: var(--primary-color); text-decoration: underline; }
 
 /* ── 微信弹窗 ── */
 .modal-overlay {
