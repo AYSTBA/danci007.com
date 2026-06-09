@@ -167,9 +167,8 @@ function initAnimations() {
       tl.to(heroTextOverlayRef.value, {
         opacity: 0,
         y: -20,
-        duration: 0.8,
+        duration: 0.5,
         ease: 'power2.in',
-        delay: 1.5,
       }, '-=0.3');
     }
 
