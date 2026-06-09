@@ -114,7 +114,7 @@ const curtainRef = ref<HTMLElement | null>(null);
 const shouldAnimate = !sessionStorage.getItem('home_animated');
 
 const isMobile = ref(window.innerWidth < 769);
-const domeMinRadius = computed(() => isMobile.value ? 200 : 600);
+const domeMinRadius = computed(() => isMobile.value ? 250 : 600);
 
 let ctx: gsap.Context | null = null;
 
@@ -493,11 +493,10 @@ const siteTitle = computed(() => {
             :images="galleryPhotos.map(p => p.url)"
             :fit="0.5"
             :min-radius="domeMinRadius"
-            :image-border-radius="isMobile ? '20px' : '30px'"
             :max-vertical-rotation-deg="9"
             :segments="20"
-            :drag-sensitivity="isMobile ? 10 : 20"
-            :drag-dampening="isMobile ? 0.5 : 3.8"
+            :drag-sensitivity="12"
+            :drag-dampening="3.8"
             :grayscale="false"
           />
         </div>
@@ -1213,7 +1212,7 @@ const siteTitle = computed(() => {
   .gallery-section { padding: 40px 0 10px; }
   .gallery-header .section-title { font-size: 22px; }
   .gallery-subtitle { font-size: 13px; }
-  .dome-container { height: 60vh; min-height: 400px; max-height: 600px; }
+  .dome-container { height: 80vh; min-height: 400px; max-height: 700px; }
 
   .page-footer { padding: 32px 16px 24px; }
   .footer-links { gap: 20px; }
