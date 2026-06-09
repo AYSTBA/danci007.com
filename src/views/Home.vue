@@ -746,7 +746,7 @@ const siteTitle = computed(() => {
 
 /* ── Banner 轮播 ── */
 .hero-section {
-  min-height: 100vh;
+  min-height: auto;
   padding-top: 10px;
   display: flex;
   align-items: center;
