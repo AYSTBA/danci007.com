@@ -8,6 +8,7 @@ import { normalizeActive } from '../types';
 import { useLanguage } from '../composables/useLanguage';
 import { useBannerCarousel } from '../composables/useBannerCarousel';
 import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml, fetchJson } from '../utils';
+import DomeGallery from '../components/DomeGallery.vue';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -23,13 +24,6 @@ const error = ref<string | null>(null);
 const galleryPhotos = Array.from({ length: 12 }, (_, i) => ({
   url: `/images/gallery/photo-${String(i + 1).padStart(2, '0')}.jpg`,
 }));
-
-function fallbackImg(e: Event) {
-  const img = e.target as HTMLImageElement;
-  const i = galleryPhotos.findIndex(p => p.url === img.src);
-  const num = String(i + 1).padStart(2, '0');
-  img.src = `/images/gallery/photo-${num}.svg`;
-}
 
 const { currentBannerIndex, stopAutoPlay, nextBanner, prevBanner } = useBannerCarousel(banners);
 
@@ -255,43 +249,6 @@ function initAnimations() {
           }
         );
       }
-
-      if (galleryGridRef.value) {
-        const photos = galleryGridRef.value.querySelectorAll('.gallery-photo');
-        gsap.fromTo(photos,
-          { y: 60, opacity: 0, scale: 0.9 },
-          {
-            y: 0, opacity: 1, scale: 1,
-            duration: 0.8, stagger: 0.06,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: galleryGridRef.value,
-              start: 'top 80%',
-              toggleActions: 'play none none none',
-            }
-          }
-        );
-
-        // Parallax on gallery images
-        photos.forEach((photo) => {
-          const img = photo.querySelector('img');
-          if (img) {
-            gsap.fromTo(img,
-              { y: -20 },
-              {
-                y: 20,
-                ease: 'none',
-                scrollTrigger: {
-                  trigger: photo,
-                  start: 'top bottom',
-                  end: 'bottom top',
-                  scrub: 1.5,
-                }
-              }
-            );
-          }
-        });
-      }
     } else {
       // Mobile: simpler fade-in
       gsap.set(curtainRef.value, { y: '-100%' });
@@ -485,27 +442,20 @@ const siteTitle = computed(() => {
 
       <!-- 学员照片墙 -->
       <section ref="gallerySectionRef" id="gallery" class="gallery-section">
-        <div class="container">
-          <div ref="galleryTitleRef" class="gallery-header">
-            <h2 class="section-title">{{ currentLang === 'zh' ? '学员风采' : 'Student Gallery' }}</h2>
-            <p class="gallery-subtitle">{{ currentLang === 'zh' ? '记录每一位学员的成长瞬间' : 'Moments of every student\'s growth' }}</p>
-          </div>
-          <div ref="galleryGridRef" class="gallery-grid">
-            <div
-              v-for="(photo, index) in galleryPhotos"
-              :key="index"
-              class="gallery-photo"
-            >
-              <div class="gallery-photo-inner">
-                <img
-                  :src="photo.url"
-                  :alt="currentLang === 'zh' ? '学员风采' : 'Student Gallery'"
-                  loading="lazy"
-                  @error="fallbackImg($event)"
-                />
-              </div>
-            </div>
-          </div>
+        <div class="gallery-header">
+          <h2 ref="galleryTitleRef" class="section-title">{{ currentLang === 'zh' ? '学员风采' : 'Student Gallery' }}</h2>
+          <p class="gallery-subtitle">{{ currentLang === 'zh' ? '记录每一位学员的成长瞬间' : 'Moments of every student\'s growth' }}</p>
+        </div>
+        <div ref="galleryGridRef" class="dome-container">
+          <DomeGallery
+            :images="galleryPhotos.map(p => p.url)"
+            :fit="0.5"
+            :min-radius="600"
+            :max-vertical-rotation-deg="9"
+            :segments="20"
+            :drag-dampening="3.8"
+            :grayscale="false"
+          />
         </div>
       </section>
 
@@ -1013,9 +963,6 @@ const siteTitle = computed(() => {
   margin: 0;
 }
 
-/* ══════════════════════════════════════════════
-   学员照片墙
-   ══════════════════════════════════════════════ */
 .gallery-section {
   position: relative;
   z-index: 1;
@@ -1025,7 +972,7 @@ const siteTitle = computed(() => {
 
 .gallery-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 0;
 }
 
 .gallery-header .section-title {
@@ -1044,47 +991,18 @@ const siteTitle = computed(() => {
   margin-top: 4px;
 }
 
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  grid-auto-rows: 110px;
-  gap: 12px;
-}
-
-.gallery-photo {
+.dome-container {
+  width: 100%;
+  height: 80vh;
+  min-height: 500px;
+  max-height: 800px;
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.gallery-photo:hover {
-  transform: scale(1.08);
-  box-shadow: 0 12px 32px rgba(67, 160, 71, 0.25);
-  z-index: 5;
-}
-
-.gallery-photo-inner {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.gallery-photo-inner img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.5s ease;
-}
-
-.gallery-photo:hover .gallery-photo-inner img {
-  transform: scale(1.1);
-}
-
-/* ── 页脚 ── */
+/* ══════════════════════════════════════════════
+   页脚
+   ══════════════════════════════════════════════ */
 .page-footer {
   padding: 48px 40px 32px;
   text-align: center;
@@ -1259,8 +1177,7 @@ const siteTitle = computed(() => {
   .gallery-section { padding: 40px 0 10px; }
   .gallery-header .section-title { font-size: 22px; }
   .gallery-subtitle { font-size: 13px; }
-  .gallery-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 90px; gap: 8px; }
-  .gallery-photo { border-radius: 8px; }
+  .dome-container { height: 60vh; min-height: 400px; max-height: 600px; }
 
   .page-footer { padding: 32px 16px 24px; }
   .footer-links { gap: 20px; }
