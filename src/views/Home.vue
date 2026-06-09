@@ -114,8 +114,8 @@ const curtainRef = ref<HTMLElement | null>(null);
 const shouldAnimate = !sessionStorage.getItem('home_animated');
 
 const isMobile = ref(window.innerWidth < 769);
-const domeMinRadius = computed(() => isMobile.value ? 70 : 600);
-const domeFit = computed(() => isMobile.value ? 0.21 : 0.5);
+const domeMinRadius = computed(() => isMobile.value ? 100 : 600);
+const domeFit = computed(() => isMobile.value ? 0.3 : 0.5);
 
 let ctx: gsap.Context | null = null;
 
