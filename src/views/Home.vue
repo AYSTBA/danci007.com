@@ -1,25 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Banner, PageContents, Teacher } from '../types';
 import { normalizeActive } from '../types';
 import { useLanguage } from '../composables/useLanguage';
 import { useBannerCarousel } from '../composables/useBannerCarousel';
 import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml, fetchJson } from '../utils';
 
-const router = useRouter();
+gsap.registerPlugin(ScrollTrigger);
 
-// ── 共享 composables ──
+const router = useRouter();
 const { currentLang, showLangDropdown, toggleLanguage, selectLanguage } = useLanguage();
 
-// ── 数据 ──
 const banners = ref<Banner[]>([]);
 const pageContents = ref<PageContents>({});
 const teachers = ref<Teacher[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-// ── 学员照片墙 ──
 const galleryPhotos = Array.from({ length: 12 }, (_, i) => ({
   url: `/images/gallery/photo-${String(i + 1).padStart(2, '0')}.jpg`,
 }));
@@ -31,11 +31,8 @@ function fallbackImg(e: Event) {
   img.src = `/images/gallery/photo-${num}.svg`;
 }
 
-// ── Banner 轮播 ──
-const { currentBannerIndex, stopAutoPlay, nextBanner, prevBanner } =
-  useBannerCarousel(banners);
+const { currentBannerIndex, stopAutoPlay, nextBanner, prevBanner } = useBannerCarousel(banners);
 
-// ── 触摸滑动支持 ──
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
@@ -65,7 +62,6 @@ const onTouchEnd = (e: TouchEvent) => {
   }
 };
 
-// ── 滚动 ──
 const lastScrollY = ref(0);
 const isNavVisible = ref(true);
 const showMobileMenu = ref(false);
@@ -79,16 +75,9 @@ const loadData = async () => {
       fetchJson<PageContents>('/api/pages/home/contents'),
       fetchJson<Teacher[]>('/api/teachers')
     ]);
-
-    banners.value = bannerData.map((b: any) => ({
-      ...b,
-      active: normalizeActive(b.active)
-    }));
+    banners.value = bannerData.map((b: any) => ({ ...b, active: normalizeActive(b.active) }));
     pageContents.value = contents;
-    teachers.value = teacherData.map((t: any) => ({
-      ...t,
-      active: normalizeActive(t.active)
-    }));
+    teachers.value = teacherData.map((t: any) => ({ ...t, active: normalizeActive(t.active) }));
   } catch (e: any) {
     error.value = e.message || '加载失败，请检查网络连接';
   } finally {
@@ -102,33 +91,224 @@ const getParagraphs = (text: string) => {
 };
 
 const getBannerImage = (banner: Banner) => {
-  if (currentLang.value === 'en') {
-    return banner.image_url_en || banner.image_url;
-  }
+  if (currentLang.value === 'en') return banner.image_url_en || banner.image_url;
   return banner.image_url || banner.image_url_en;
 };
 
 const getBannerTitle = (banner: Banner) => {
-  if (currentLang.value === 'en') {
-    return banner.title_en || banner.title;
-  }
+  if (currentLang.value === 'en') return banner.title_en || banner.title;
   return banner.title || banner.title_en;
 };
 
-onMounted(() => {
-  loadData();
+// ── Animation refs ──
+const heroRef = ref<HTMLElement | null>(null);
+const heroTitleRef = ref<HTMLElement | null>(null);
+const heroSubRef = ref<HTMLElement | null>(null);
+const whySectionRef = ref<HTMLElement | null>(null);
+const whyTitleRef = ref<HTMLElement | null>(null);
+const whyContentRef = ref<HTMLElement | null>(null);
+const teachersSectionRef = ref<HTMLElement | null>(null);
+const teachersTitleRef = ref<HTMLElement | null>(null);
+const teachersGridRef = ref<HTMLElement | null>(null);
+const gallerySectionRef = ref<HTMLElement | null>(null);
+const galleryTitleRef = ref<HTMLElement | null>(null);
+const galleryGridRef = ref<HTMLElement | null>(null);
+const curtainRef = ref<HTMLElement | null>(null);
+
+let ctx: gsap.Context | null = null;
+
+function initAnimations() {
+  ctx = gsap.context(() => {
+    const isMobile = window.innerWidth < 769;
+    const mm = ScrollTrigger.matchMedia();
+
+    // ── Opening animation ──
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    // Curtain slides up
+    if (curtainRef.value) {
+      tl.to(curtainRef.value, {
+        y: '-100%',
+        duration: 1.4,
+        ease: 'power4.inOut',
+      });
+    }
+
+    // Hero title: compress-restore entrance
+    if (heroTitleRef.value) {
+      tl.fromTo(heroTitleRef.value,
+        { scaleX: 0.6, scaleY: 1.4, y: 60, opacity: 0 },
+        { scaleX: 1, scaleY: 1, y: 0, opacity: 1, duration: 1.2, ease: 'power4.out' },
+        '-=0.6'
+      );
+    }
+
+    // Hero subtitle
+    if (heroSubRef.value) {
+      tl.fromTo(heroSubRef.value,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.9, ease: 'power2.out' },
+        '-=0.4'
+      );
+    }
+
+    // Banner fade in
+    if (heroRef.value) {
+      tl.fromTo(heroRef.value.querySelector('.hero-banner-wrapper'),
+        { opacity: 0, scale: 0.95 },
+        { opacity: 1, scale: 1, duration: 1.2, ease: 'power2.out' },
+        '-=0.5'
+      );
+    }
+
+    // ── Scroll-triggered: Why section ──
+    if (!isMobile) {
+      // Why section title
+      if (whyTitleRef.value) {
+        gsap.fromTo(whyTitleRef.value,
+          { y: 100, opacity: 0, scale: 0.9 },
+          {
+            y: 0, opacity: 1, scale: 1,
+            duration: 1.2, ease: 'power3.out',
+            scrollTrigger: {
+              trigger: whySectionRef.value,
+              start: 'top 75%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+      }
+
+      // Why content stagger
+      if (whyContentRef.value) {
+        const items = whyContentRef.value.querySelectorAll('h3, p');
+        gsap.fromTo(items,
+          { y: 50, opacity: 0, rotateX: 5 },
+          {
+            y: 0, opacity: 1, rotateX: 0,
+            duration: 0.9, stagger: 0.15,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: whyContentRef.value,
+              start: 'top 80%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+      }
+
+      // ── Teachers section ──
+      if (teachersTitleRef.value) {
+        gsap.fromTo(teachersTitleRef.value,
+          { y: 100, opacity: 0, scale: 0.9 },
+          {
+            y: 0, opacity: 1, scale: 1,
+            duration: 1.2, ease: 'power3.out',
+            scrollTrigger: {
+              trigger: teachersSectionRef.value,
+              start: 'top 75%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+      }
+
+      if (teachersGridRef.value) {
+        const cards = teachersGridRef.value.querySelectorAll('.teacher-card');
+        gsap.fromTo(cards,
+          { y: 80, opacity: 0, scale: 0.92 },
+          {
+            y: 0, opacity: 1, scale: 1,
+            duration: 0.9, stagger: 0.12,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: teachersGridRef.value,
+              start: 'top 80%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+      }
+
+      // ── Gallery section ──
+      if (galleryTitleRef.value) {
+        gsap.fromTo(galleryTitleRef.value,
+          { y: 80, opacity: 0 },
+          {
+            y: 0, opacity: 1, duration: 1, ease: 'power3.out',
+            scrollTrigger: {
+              trigger: gallerySectionRef.value,
+              start: 'top 75%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+      }
+
+      if (galleryGridRef.value) {
+        const photos = galleryGridRef.value.querySelectorAll('.gallery-photo');
+        gsap.fromTo(photos,
+          { y: 60, opacity: 0, scale: 0.9 },
+          {
+            y: 0, opacity: 1, scale: 1,
+            duration: 0.8, stagger: 0.06,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: galleryGridRef.value,
+              start: 'top 80%',
+              toggleActions: 'play none none none',
+            }
+          }
+        );
+
+        // Parallax on gallery images
+        photos.forEach((photo) => {
+          const img = photo.querySelector('img');
+          if (img) {
+            gsap.fromTo(img,
+              { y: -20 },
+              {
+                y: 20,
+                ease: 'none',
+                scrollTrigger: {
+                  trigger: photo,
+                  start: 'top bottom',
+                  end: 'bottom top',
+                  scrub: 1.5,
+                }
+              }
+            );
+          }
+        });
+      }
+    } else {
+      // Mobile: simpler fade-in
+      gsap.set(curtainRef.value, { y: '-100%' });
+      if (heroTitleRef.value) gsap.set(heroTitleRef.value, { opacity: 1, scaleX: 1, scaleY: 1, y: 0 });
+      if (heroSubRef.value) gsap.set(heroSubRef.value, { opacity: 1, y: 0 });
+      if (heroRef.value) gsap.set(heroRef.value.querySelector('.hero-banner-wrapper'), { opacity: 1, scale: 1 });
+    }
+
+    ScrollTrigger.refresh();
+  }, document.getElementById('home-root') || undefined);
+}
+
+onMounted(async () => {
+  await loadData();
+  await nextTick();
+  initAnimations();
   window.addEventListener('scroll', updateNavVisibility);
   updateNavVisibility();
 });
 
 onUnmounted(() => {
+  if (ctx) ctx.revert();
   window.removeEventListener('scroll', updateNavVisibility);
   stopAutoPlay();
 });
 
 const updateNavVisibility = () => {
   const scrollY = window.scrollY;
-
   if (scrollY > lastScrollY.value && scrollY > 100) {
     isNavVisible.value = false;
   } else {
@@ -145,187 +325,214 @@ const siteTitle = computed(() => {
 </script>
 
 <template>
-  <!-- Loading -->
-  <div v-if="loading" class="global-loading">
-    <div class="spinner"></div>
-    <span class="loading-text">加载中...</span>
-  </div>
+  <div id="home-root">
+    <!-- Loading -->
+    <div v-if="loading" class="global-loading">
+      <div class="spinner"></div>
+      <span class="loading-text">加载中...</span>
+    </div>
 
-  <!-- Error -->
-  <div v-else-if="error" class="global-error">
-    <div class="error-icon">⚠️</div>
-    <div class="error-title">页面加载失败</div>
-    <div class="error-message">{{ error }}</div>
-    <button class="error-retry-btn" @click="loadData">重新加载</button>
-  </div>
+    <!-- Error -->
+    <div v-else-if="error" class="global-error">
+      <div class="error-icon">⚠️</div>
+      <div class="error-title">页面加载失败</div>
+      <div class="error-message">{{ error }}</div>
+      <button class="error-retry-btn" @click="loadData">重新加载</button>
+    </div>
 
-  <!-- 正常内容 -->
-  <div v-else class="page-container">
-    <!-- 顶部导航栏 -->
-    <header class="page-header" :class="{ 'nav-hidden': !isNavVisible }">
-      <div class="header-inner">
-        <div class="header-left">
-          <span class="site-title">{{ siteTitle }}</span>
-        </div>
-        <div class="header-right">
-          <a href="/about" class="nav-link">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</a>
-          <a href="/enrollment" class="nav-link">{{ currentLang === 'zh' ? '课程报名' : 'Enroll' }}</a>
-          <a href="/booking" class="nav-link">{{ currentLang === 'zh' ? '预约与联系' : 'Booking & Contact' }}</a>
-          <div class="lang-dropdown">
-            <button class="lang-dropdown-btn" @click.stop="toggleLanguage">
-              <img src="/translate-languange-switch-svgrepo-com.svg" class="lang-icon" alt="语言切换" />
-            </button>
-            <div class="lang-dropdown-content" v-show="showLangDropdown">
-              <a href="#" @click.prevent="selectLanguage('zh')">简体中文</a>
-              <a href="#" @click.prevent="selectLanguage('en')">English</a>
-            </div>
+    <div v-else class="page-container">
+      <!-- Curtain overlay -->
+      <div ref="curtainRef" class="curtain-overlay"></div>
+
+      <!-- 顶部导航栏 -->
+      <header class="page-header" :class="{ 'nav-hidden': !isNavVisible }">
+        <div class="header-inner">
+          <div class="header-left">
+            <span class="site-title">{{ siteTitle }}</span>
           </div>
-          <button class="menu-btn" @click="showMobileMenu = !showMobileMenu">
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-        </div>
-      </div>
-      <div v-if="showMobileMenu" class="mobile-nav">
-        <a href="#hero" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '首页' : 'Home' }}</a>
-        <a href="/about" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</a>
-        <a href="/enrollment" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '课程报名' : 'Enroll' }}</a>
-        <a href="/booking" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '预约与联系' : 'Booking & Contact' }}</a>
-      </div>
-    </header>
-
-    <!-- Banner 轮播 -->
-    <section id="hero" class="hero-section">
-      <div class="hero-inner">
-        <div class="hero-banner-wrapper">
-          <div class="hero-banner" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
-            <img
-              v-for="(banner, index) in banners"
-              :key="banner.id"
-              :src="getImageUrl(getBannerImage(banner))"
-              :alt="getBannerTitle(banner)"
-              :class="['banner-img', { active: index === currentBannerIndex }]"
-              draggable="false"
-            />
-            <div v-if="banners.length === 0" class="banner-placeholder">
-              <span>{{ currentLang === 'zh' ? '活动图片' : 'Activity Image' }}</span>
+          <div class="header-right">
+            <a href="/about" class="nav-link">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</a>
+            <a href="/enrollment" class="nav-link">{{ currentLang === 'zh' ? '课程报名' : 'Enroll' }}</a>
+            <a href="/booking" class="nav-link">{{ currentLang === 'zh' ? '预约与联系' : 'Booking & Contact' }}</a>
+            <div class="lang-dropdown">
+              <button class="lang-dropdown-btn" @click.stop="toggleLanguage">
+                <img src="/translate-languange-switch-svgrepo-com.svg" class="lang-icon" alt="语言切换" />
+              </button>
+              <div class="lang-dropdown-content" v-show="showLangDropdown">
+                <a href="#" @click.prevent="selectLanguage('zh')">简体中文</a>
+                <a href="#" @click.prevent="selectLanguage('en')">English</a>
+              </div>
             </div>
-            <button class="banner-nav-prev glass-btn" @click.stop="prevBanner">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 19l-7-7 7-7"/>
-              </svg>
+            <button class="menu-btn" @click="showMobileMenu = !showMobileMenu">
+              <span></span>
+              <span></span>
+              <span></span>
             </button>
-            <button class="banner-nav-next glass-btn" @click.stop="nextBanner">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 5l7 7-7 7"/>
-              </svg>
-            </button>
-            <div v-if="banners.length > 1" class="banner-dots">
-              <span
-                v-for="(_, index) in banners"
-                :key="index"
-                :class="['dot', { active: index === currentBannerIndex }]"
-              ></span>
-            </div>
           </div>
-          <img src="/down-arrow.svg" alt="Down Arrow" class="banner-arrow banner-arrow-left" />
-          <img src="/down-arrow.svg" alt="Down Arrow" class="banner-arrow banner-arrow-right" />
         </div>
-      </div>
-    </section>
+        <div v-if="showMobileMenu" class="mobile-nav">
+          <a href="#hero" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '首页' : 'Home' }}</a>
+          <a href="/about" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</a>
+          <a href="/enrollment" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '课程报名' : 'Enroll' }}</a>
+          <a href="/booking" @click="showMobileMenu = false">{{ currentLang === 'zh' ? '预约与联系' : 'Booking & Contact' }}</a>
+        </div>
+      </header>
 
-    <!-- 为什么选择我们 -->
-    <section id="why" class="why-section">
-      <div class="why-inner">
-        <div class="why-content-wrapper">
-          <h2 class="section-title">{{ currentLang === 'zh' ? (pageContents.why_title || '为什么选择我们') : (pageContents.why_title_en || 'Why Choose Us') }}</h2>
-          <div class="why-content">
-            <div class="md-text">
-              <div v-for="(para, index) in getParagraphs(currentLang === 'zh' ? (pageContents.why_content || '') : (pageContents.why_content_en || ''))" :key="index">
-                <h3 v-if="para.isTitle" v-html="sanitizeHtml(para.text)"></h3>
-                <p v-else v-html="sanitizeHtml(para.text)"></p>
+      <!-- Banner 轮播 -->
+      <section ref="heroRef" id="hero" class="hero-section">
+        <div class="hero-text-overlay">
+          <h1 ref="heroTitleRef" class="hero-main-title">
+            {{ currentLang === 'zh'
+              ? (pageContents.hero_title || '欢迎来到深圳市龙岗区教学点')
+              : (pageContents.hero_title_en || 'Welcome to Longgang District Teaching Center') }}
+          </h1>
+          <p ref="heroSubRef" class="hero-subtitle">
+            {{ currentLang === 'zh'
+              ? (pageContents.hero_subtitle || '单词突击007 - 智能单词学习系统')
+              : (pageContents.hero_subtitle_en || 'Word Assault 007 - Intelligent Word Learning System') }}
+          </p>
+        </div>
+        <div class="hero-inner">
+          <div class="hero-banner-wrapper">
+            <div class="hero-banner" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+              <img
+                v-for="(banner, index) in banners"
+                :key="banner.id"
+                :src="getImageUrl(getBannerImage(banner))"
+                :alt="getBannerTitle(banner)"
+                :class="['banner-img', { active: index === currentBannerIndex }]"
+                draggable="false"
+              />
+              <div v-if="banners.length === 0" class="banner-placeholder">
+                <span>{{ currentLang === 'zh' ? '活动图片' : 'Activity Image' }}</span>
+              </div>
+              <button class="banner-nav-prev glass-btn" @click.stop="prevBanner">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <button class="banner-nav-next glass-btn" @click.stop="nextBanner">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 5l7 7-7 7"/>
+                </svg>
+              </button>
+              <div v-if="banners.length > 1" class="banner-dots">
+                <span
+                  v-for="(_, index) in banners"
+                  :key="index"
+                  :class="['dot', { active: index === currentBannerIndex }]"
+                ></span>
+              </div>
+            </div>
+            <img src="/down-arrow.svg" alt="Down Arrow" class="banner-arrow banner-arrow-left" />
+            <img src="/down-arrow.svg" alt="Down Arrow" class="banner-arrow banner-arrow-right" />
+          </div>
+        </div>
+      </section>
+
+      <!-- 为什么选择我们 -->
+      <section ref="whySectionRef" id="why" class="why-section">
+        <div class="why-inner">
+          <div class="why-content-wrapper">
+            <h2 ref="whyTitleRef" class="section-title">{{ currentLang === 'zh' ? (pageContents.why_title || '为什么选择我们') : (pageContents.why_title_en || 'Why Choose Us') }}</h2>
+            <div ref="whyContentRef" class="why-content">
+              <div class="md-text">
+                <div v-for="(para, index) in getParagraphs(currentLang === 'zh' ? (pageContents.why_content || '') : (pageContents.why_content_en || ''))" :key="index">
+                  <h3 v-if="para.isTitle" v-html="sanitizeHtml(para.text)"></h3>
+                  <p v-else v-html="sanitizeHtml(para.text)"></p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- 师资力量 -->
-    <section id="teachers" class="teachers-section">
-      <div class="teachers-inner">
-        <h2 class="section-title">{{ currentLang === 'zh' ? '我们的师资力量' : 'Our Teachers' }}</h2>
-        <div class="teachers-grid">
-          <div
-            v-for="teacher in teachers"
-            :key="teacher.id"
-            class="teacher-card"
-          >
-            <div class="teacher-avatar">
-              <img
-                :src="getAvatarUrl(teacher.avatar)"
-                :alt="currentLang === 'zh' ? teacher.name : teacher.name_en"
-                @error="($event.target as HTMLImageElement).src = getAvatarUrl('')"
-              />
-            </div>
-            <h3 class="teacher-name">{{ currentLang === 'zh' ? teacher.name : teacher.name_en }}</h3>
-            <p class="teacher-title">{{ currentLang === 'zh' ? teacher.title : teacher.title_en }}</p>
-            <p class="teacher-desc">{{ currentLang === 'zh' ? teacher.description : teacher.description_en }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 学员照片墙 -->
-    <section id="gallery" class="gallery-section">
-      <div class="container">
-        <div class="gallery-header">
-          <h2 class="section-title">{{ currentLang === 'zh' ? '学员风采' : 'Student Gallery' }}</h2>
-          <p class="gallery-subtitle">{{ currentLang === 'zh' ? '记录每一位学员的成长瞬间' : 'Moments of every student\'s growth' }}</p>
-        </div>
-        <div class="gallery-grid">
-          <div
-            v-for="(photo, index) in galleryPhotos"
-            :key="index"
-            class="gallery-photo"
-          >
-            <div class="gallery-photo-inner">
-              <img
-                :src="photo.url"
-                :alt="currentLang === 'zh' ? '学员风采' : 'Student Gallery'"
-                loading="lazy"
-                @error="fallbackImg($event)"
-              />
+      <!-- 师资力量 -->
+      <section ref="teachersSectionRef" id="teachers" class="teachers-section">
+        <div class="teachers-inner">
+          <h2 ref="teachersTitleRef" class="section-title">{{ currentLang === 'zh' ? '我们的师资力量' : 'Our Teachers' }}</h2>
+          <div ref="teachersGridRef" class="teachers-grid">
+            <div
+              v-for="teacher in teachers"
+              :key="teacher.id"
+              class="teacher-card"
+            >
+              <div class="teacher-avatar">
+                <img
+                  :src="getAvatarUrl(teacher.avatar)"
+                  :alt="currentLang === 'zh' ? teacher.name : teacher.name_en"
+                  @error="($event.target as HTMLImageElement).src = getAvatarUrl('')"
+                />
+              </div>
+              <h3 class="teacher-name">{{ currentLang === 'zh' ? teacher.name : teacher.name_en }}</h3>
+              <p class="teacher-title">{{ currentLang === 'zh' ? teacher.title : teacher.title_en }}</p>
+              <p class="teacher-desc">{{ currentLang === 'zh' ? teacher.description : teacher.description_en }}</p>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- 页脚 -->
-    <footer class="page-footer">
-      <div class="footer-top">
-        <span class="footer-brand">{{ currentLang === 'zh' ? (pageContents.site_name || '中萱文化') : (pageContents.site_name_en || 'Zhongxuan Culture') }}</span>
-        <div class="footer-links">
-          <router-link to="/" class="footer-link">{{ currentLang === 'zh' ? '首页' : 'Home' }}</router-link>
-          <router-link to="/about" class="footer-link">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</router-link>
-          <router-link to="/enrollment" class="footer-link">{{ currentLang === 'zh' ? '课程报名' : 'Enrollment' }}</router-link>
-          <router-link to="/booking" class="footer-link">{{ currentLang === 'zh' ? '预约联系' : 'Contact' }}</router-link>
-          <router-link to="/admin" class="footer-link">{{ currentLang === 'zh' ? '后台管理' : 'Admin' }}</router-link>
+      <!-- 学员照片墙 -->
+      <section ref="gallerySectionRef" id="gallery" class="gallery-section">
+        <div class="container">
+          <div ref="galleryTitleRef" class="gallery-header">
+            <h2 class="section-title">{{ currentLang === 'zh' ? '学员风采' : 'Student Gallery' }}</h2>
+            <p class="gallery-subtitle">{{ currentLang === 'zh' ? '记录每一位学员的成长瞬间' : 'Moments of every student\'s growth' }}</p>
+          </div>
+          <div ref="galleryGridRef" class="gallery-grid">
+            <div
+              v-for="(photo, index) in galleryPhotos"
+              :key="index"
+              class="gallery-photo"
+            >
+              <div class="gallery-photo-inner">
+                <img
+                  :src="photo.url"
+                  :alt="currentLang === 'zh' ? '学员风采' : 'Student Gallery'"
+                  loading="lazy"
+                  @error="fallbackImg($event)"
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="footer-bottom">
-        <span class="footer-note">{{ currentLang === 'zh' ? (pageContents.site_note || '中萱百日学通文化的简称') : (pageContents.site_note_en || 'Abbreviation for Zhongxuan Bairixuetong Culture') }}</span>
-        <span class="footer-copy">&copy; {{ new Date().getFullYear() }} {{ pageContents.site_name || '中萱文化' }}. All rights reserved.</span>
-        <a v-if="currentLang === 'zh'" class="footer-icp" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
-      </div>
-    </footer>
+      </section>
 
+      <!-- 页脚 -->
+      <footer class="page-footer">
+        <div class="footer-top">
+          <span class="footer-brand">{{ currentLang === 'zh' ? (pageContents.site_name || '中萱文化') : (pageContents.site_name_en || 'Zhongxuan Culture') }}</span>
+          <div class="footer-links">
+            <router-link to="/" class="footer-link">{{ currentLang === 'zh' ? '首页' : 'Home' }}</router-link>
+            <router-link to="/about" class="footer-link">{{ currentLang === 'zh' ? '关于我们' : 'About' }}</router-link>
+            <router-link to="/enrollment" class="footer-link">{{ currentLang === 'zh' ? '课程报名' : 'Enrollment' }}</router-link>
+            <router-link to="/booking" class="footer-link">{{ currentLang === 'zh' ? '预约联系' : 'Contact' }}</router-link>
+            <router-link to="/admin" class="footer-link">{{ currentLang === 'zh' ? '后台管理' : 'Admin' }}</router-link>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span class="footer-note">{{ currentLang === 'zh' ? (pageContents.site_note || '中萱百日学通文化的简称') : (pageContents.site_note_en || 'Abbreviation for Zhongxuan Bairixuetong Culture') }}</span>
+          <span class="footer-copy">&copy; {{ new Date().getFullYear() }} {{ pageContents.site_name || '中萱文化' }}. All rights reserved.</span>
+          <a v-if="currentLang === 'zh'" class="footer-icp" href="https://icp.gov.moe/?keyword=20260235" target="_blank" rel="noopener noreferrer">✮ 萌ICP备20260235号 ✮</a>
+        </div>
+      </footer>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════════════
+   Curtain overlay
+   ══════════════════════════════════════════════ */
+.curtain-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #1a1a2e;
+  z-index: 999;
+  pointer-events: none;
+}
+
 /* ══════════════════════════════════════════════
    桌面端基础样式
    ══════════════════════════════════════════════ */
@@ -390,11 +597,7 @@ const siteTitle = computed(() => {
   margin: 0 auto;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+.header-left { display: flex; align-items: center; gap: 4px; }
 
 .site-title {
   font-size: 1.1rem;
@@ -403,11 +606,7 @@ const siteTitle = computed(() => {
   letter-spacing: 0.5px;
 }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-}
+.header-right { display: flex; align-items: center; gap: 30px; }
 
 .nav-link {
   color: #333;
@@ -427,8 +626,7 @@ const siteTitle = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 44px; height: 44px;
   background: rgba(0,0,0,0.05);
   border: 1px solid #ddd;
   border-radius: 50%;
@@ -469,9 +667,7 @@ const siteTitle = computed(() => {
   transition: background 0.2s;
 }
 
-.lang-dropdown-content a:hover {
-  background: rgba(0,0,0,0.05);
-}
+.lang-dropdown-content a:hover { background: rgba(0,0,0,0.05); }
 
 .menu-btn {
   display: none;
@@ -487,19 +683,13 @@ const siteTitle = computed(() => {
   justify-content: center;
 }
 
-.menu-btn span {
-  width: 20px;
-  height: 2px;
-  background: #555;
-  border-radius: 2px;
-}
+.menu-btn span { width: 20px; height: 2px; background: #555; border-radius: 2px; }
 
 .mobile-nav {
   display: none;
   background: rgba(255,255,255,0.98);
   padding: 16px 20px;
   flex-direction: column;
-  gap: 0;
   border-top: 1px solid #f0f0f0;
 }
 
@@ -514,8 +704,40 @@ const siteTitle = computed(() => {
   border-bottom: 1px solid #f5f5f5;
 }
 
-.mobile-nav a:last-child {
-  border-bottom: none;
+.mobile-nav a:last-child { border-bottom: none; }
+
+/* ── Hero text overlay ── */
+.hero-text-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  text-align: center;
+  pointer-events: none;
+  width: 100%;
+  max-width: 900px;
+  padding: 0 40px;
+}
+
+.hero-main-title {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700;
+  color: #2c3e50;
+  letter-spacing: 2px;
+  line-height: 1.3;
+  margin: 0 0 20px;
+  text-shadow: 0 2px 12px rgba(255,255,255,0.5);
+  will-change: transform, opacity;
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 1.8vw, 1.4rem);
+  color: #555;
+  font-weight: 400;
+  letter-spacing: 4px;
+  margin: 0;
+  will-change: transform, opacity;
 }
 
 /* ── Banner 轮播 ── */
@@ -618,9 +840,7 @@ const siteTitle = computed(() => {
   50% { transform: translateY(-10px); }
 }
 
-.banner-dots {
-  display: none;
-}
+.banner-dots { display: none; }
 
 /* ── 为什么选择我们 ── */
 .why-section {
@@ -702,12 +922,7 @@ const siteTitle = computed(() => {
   line-height: 1.5;
 }
 
-.md-text p {
-  margin: 0 0 15px 0;
-  padding: 0;
-  line-height: 2.2;
-}
-
+.md-text p { margin: 0 0 15px 0; padding: 0; line-height: 2.2; }
 .md-text p:last-child { margin-bottom: 0; }
 .md-text strong { color: #333; font-weight: 600; }
 .md-text br { display: block; content: ""; margin-top: 0.3em; }
@@ -832,26 +1047,6 @@ const siteTitle = computed(() => {
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  opacity: 0;
-  animation: galleryFadeIn 0.8s ease forwards;
-}
-
-.gallery-photo:nth-child(1) { animation-delay: 0.05s; }
-.gallery-photo:nth-child(2) { animation-delay: 0.1s; }
-.gallery-photo:nth-child(3) { animation-delay: 0.15s; }
-.gallery-photo:nth-child(4) { animation-delay: 0.2s; }
-.gallery-photo:nth-child(5) { animation-delay: 0.25s; }
-.gallery-photo:nth-child(6) { animation-delay: 0.3s; }
-.gallery-photo:nth-child(7) { animation-delay: 0.35s; }
-.gallery-photo:nth-child(8) { animation-delay: 0.4s; }
-.gallery-photo:nth-child(9) { animation-delay: 0.45s; }
-.gallery-photo:nth-child(10) { animation-delay: 0.5s; }
-.gallery-photo:nth-child(11) { animation-delay: 0.55s; }
-.gallery-photo:nth-child(12) { animation-delay: 0.6s; }
-
-@keyframes galleryFadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .gallery-photo:hover {
@@ -863,6 +1058,7 @@ const siteTitle = computed(() => {
 .gallery-photo-inner {
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 .gallery-photo-inner img {
@@ -917,10 +1113,8 @@ const siteTitle = computed(() => {
   font-weight: 500;
   transition: color 0.2s;
 }
-.footer-link:hover {
-  color: var(--primary-color);
-  text-decoration: underline;
-}
+
+.footer-link:hover { color: var(--primary-color); text-decoration: underline; }
 
 .footer-bottom {
   display: flex;
@@ -929,30 +1123,12 @@ const siteTitle = computed(() => {
   gap: 6px;
 }
 
-.footer-note {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
+.footer-note { font-size: 0.75rem; color: var(--text-secondary); }
+.footer-copy { font-size: 0.72rem; color: var(--text-light); }
+.footer-icp { font-size: 0.72rem; color: var(--text-light); text-decoration: none; transition: color 0.2s; }
+.footer-icp:hover { color: var(--primary-color); }
 
-.footer-copy {
-  font-size: 0.72rem;
-  color: var(--text-light);
-}
-
-.footer-icp {
-  font-size: 0.72rem;
-  color: var(--text-light);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.footer-icp:hover {
-  color: var(--primary-color);
-}
-
-/* ── 移动端底部 Tab Bar ── */
-.mobile-tab-bar {
-  display: none;
-}
+.mobile-tab-bar { display: none; }
 
 /* ══════════════════════════════════════════════
    桌面端滚动条
@@ -965,81 +1141,48 @@ const siteTitle = computed(() => {
 }
 
 /* ══════════════════════════════════════════════
-   平板端 992px
+   平板端
    ══════════════════════════════════════════════ */
 @media (max-width: 992px) {
-  .teachers-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .teachers-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ══════════════════════════════════════════════
-   移动端 App 模式 ≤768px
+   移动端
    ══════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .page-container {
-    padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 8px);
-  }
+  .curtain-overlay { display: none; }
 
-  .header-inner {
-    padding: 12px 16px;
-    padding-top: calc(12px + var(--safe-top));
-  }
+  .page-container { padding-bottom: calc(var(--tab-bar-h) + var(--safe-bottom) + 8px); }
 
-  .header-right {
-    gap: 8px;
-  }
-
+  .header-inner { padding: 12px 16px; padding-top: calc(12px + var(--safe-top)); }
+  .header-right { gap: 8px; }
   .nav-link { display: none; }
+  .menu-btn { display: flex; }
+  .mobile-nav { display: flex; }
 
-  .menu-btn {
-    display: flex;
+  .hero-text-overlay {
+    position: relative;
+    top: auto; left: auto;
+    transform: none;
+    padding: calc(80px + var(--safe-top)) 16px 20px;
   }
 
-  .mobile-nav {
-    display: flex;
-  }
-
-  /* ── Banner ── */
   .hero-section {
-    padding-top: calc(64px + var(--safe-top, 0px));
+    padding-top: 0;
     min-height: auto;
     padding-bottom: 24px;
+    flex-direction: column;
   }
 
-  .hero-inner {
-    padding: 0 16px;
-    justify-content: center;
-  }
+  .hero-inner { padding: 0 16px; justify-content: center; }
+  .hero-banner-wrapper { width: 100%; }
+  .hero-banner { border-radius: 16px; touch-action: pan-y; }
 
-  .hero-banner-wrapper {
-    width: 100%;
-  }
-
-  .hero-banner {
-    border-radius: 16px;
-    touch-action: pan-y;
-  }
-
-  .banner-nav-prev {
-    left: 8px;
-    width: 44px;
-    height: 44px;
-  }
-
-  .banner-nav-next {
-    right: 8px;
-    width: 44px;
-    height: 44px;
-  }
-
+  .banner-nav-prev { left: 8px; width: 44px; height: 44px; }
+  .banner-nav-next { right: 8px; width: 44px; height: 44px; }
   .banner-arrow { display: none; }
-
-  .banner-nav-prev svg,
-  .banner-nav-next svg {
-    width: 20px;
-    height: 20px;
-  }
+  .banner-nav-prev svg, .banner-nav-next svg { width: 20px; height: 20px; }
 
   .banner-dots {
     display: flex;
@@ -1052,8 +1195,7 @@ const siteTitle = computed(() => {
   }
 
   .dot {
-    width: 6px;
-    height: 6px;
+    width: 6px; height: 6px;
     border-radius: 50%;
     background: rgba(255,255,255,0.5);
     transition: all 0.3s;
@@ -1065,27 +1207,14 @@ const siteTitle = computed(() => {
     background: white;
   }
 
-  /* ── 为什么选择我们 ── */
   .why-section {
     padding: 32px 16px;
     min-height: auto;
   }
 
-  .why-inner {
-    padding: 0;
-    align-items: stretch;
-    width: 100%;
-  }
-
-  .why-content-wrapper {
-    width: 100%;
-  }
-
-  .why-content {
-    width: 100%;
-    padding: 24px 20px;
-    border-radius: 16px;
-  }
+  .why-inner { padding: 0; align-items: stretch; width: 100%; }
+  .why-content-wrapper { width: 100%; }
+  .why-content { width: 100%; padding: 24px 20px; border-radius: 16px; }
 
   .md-text {
     text-align: left;
@@ -1093,139 +1222,55 @@ const siteTitle = computed(() => {
     line-height: 1.7;
   }
 
-  .md-text h3 {
-    font-size: 17px;
-    margin-top: 24px;
-    margin-bottom: 12px;
-    text-align: left;
-  }
+  .md-text h3 { font-size: 17px; margin-top: 24px; margin-bottom: 12px; text-align: left; }
+  .md-text p { line-height: 1.7; margin-bottom: 12px; }
 
-  .md-text p {
-    line-height: 1.7;
-    margin-bottom: 12px;
-  }
-
-  .section-title {
-    font-size: 20px;
-    margin-bottom: 24px;
-    letter-spacing: 0.5px;
-  }
-
+  .section-title { font-size: 20px; margin-bottom: 24px; letter-spacing: 0.5px; }
   .section-title::before,
-  .section-title::after {
-    width: 60px;
-  }
-
+  .section-title::after { width: 60px; }
   .section-title::before { top: -16px; }
   .section-title::after { bottom: -16px; }
 
-  /* ── 师资力量 ── */
   .teachers-section {
     padding: 32px 16px;
     min-height: auto;
     justify-content: center;
   }
 
-  .teachers-inner {
-    width: 100%;
-  }
+  .teachers-inner { width: 100%; }
+  .teachers-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 24px; }
+  .teacher-card { padding: 20px 12px; border-radius: 16px; }
+  .teacher-avatar { width: 88px; height: 88px; margin-bottom: 12px; border-width: 3px; }
+  .teacher-name { font-size: 15px; margin-bottom: 4px; }
+  .teacher-title { font-size: 13px; margin-bottom: 8px; }
+  .teacher-desc { font-size: 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-  .teachers-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-top: 24px;
-  }
+  .gallery-section { padding: 40px 0 10px; }
+  .gallery-header .section-title { font-size: 22px; }
+  .gallery-subtitle { font-size: 13px; }
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 90px; gap: 8px; }
+  .gallery-photo { border-radius: 8px; }
 
-  .teacher-card {
-    padding: 20px 12px;
-    border-radius: 16px;
-  }
-
-  .teacher-avatar {
-    width: 88px; height: 88px;
-    margin-bottom: 12px;
-    border-width: 3px;
-  }
-
-  .teacher-name {
-    font-size: 15px;
-    margin-bottom: 4px;
-  }
-
-  .teacher-title {
-    font-size: 13px;
-    margin-bottom: 8px;
-  }
-
-  .teacher-desc {
-    font-size: 12px;
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* ── 照片墙 ── */
-  .gallery-section {
-    padding: 40px 0 10px;
-  }
-
-  .gallery-header .section-title {
-    font-size: 22px;
-  }
-
-  .gallery-subtitle {
-    font-size: 13px;
-  }
-
-  .gallery-grid {
-    grid-template-columns: repeat(3, 1fr);
-    grid-auto-rows: 90px;
-    gap: 8px;
-  }
-
-  .gallery-photo {
-    border-radius: 8px;
-  }
-
-  /* ── 页脚 ── */
-  .page-footer {
-    padding: 32px 16px 24px;
-  }
-
-  .footer-links {
-    gap: 20px;
-  }
-
-  .footer-link {
-    font-size: 0.85rem;
-  }
-
-  .footer-bottom {
-    gap: 4px;
-  }
-
+  .page-footer { padding: 32px 16px 24px; }
+  .footer-links { gap: 20px; }
+  .footer-link { font-size: 0.85rem; }
+  .footer-bottom { gap: 4px; }
   .footer-link { font-size: 13px; }
   .footer-note { font-size: 11px; }
 
-  /* ── 底部 Tab Bar - 磨砂玻璃效果 ── */
   .mobile-tab-bar {
     display: flex;
     position: fixed;
-    bottom: 16px; /* 悬浮效果 */
+    bottom: 16px;
     left: 16px;
     right: 16px;
     height: var(--tab-bar-h);
     background: rgba(255, 255, 255, 0.65);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-radius: 24px; /* 圆角 */
+    border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5);
     z-index: 200;
     justify-content: space-around;
     align-items: center;
@@ -1239,13 +1284,13 @@ const siteTitle = computed(() => {
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    color: rgba(0, 0, 0, 0.5);
+    color: rgba(0,0,0,0.5);
     font-size: 11px;
     font-weight: 500;
     min-width: 64px;
     min-height: var(--tab-bar-h);
     gap: 4px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
     -webkit-tap-highlight-color: transparent;
     border-radius: 16px;
     padding: 4px 12px;
@@ -1254,73 +1299,41 @@ const siteTitle = computed(() => {
   .tab-item.router-link-active,
   .tab-item.active {
     color: #3498db;
-    background: rgba(52, 152, 219, 0.12);
+    background: rgba(52,152,219,0.12);
   }
 
-  .tab-icon {
-    width: 22px;
-    height: 22px;
-    stroke-width: 1.8;
-    transition: all 0.3s ease;
-  }
+  .tab-icon { width: 22px; height: 22px; stroke-width: 1.8; transition: all 0.3s ease; }
 
   .tab-item.router-link-active .tab-icon,
-  .tab-item.active .tab-icon {
-    stroke-width: 2.2;
-    transform: scale(1.1);
-  }
+  .tab-item.active .tab-icon { stroke-width: 2.2; transform: scale(1.1); }
 
   .tab-cta {
     background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
     color: white !important;
     border-radius: 16px;
     padding: 6px 14px;
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 4px 12px rgba(76,175,80,0.3);
   }
 
-  .tab-cta .tab-icon {
-    color: white;
-    stroke: white;
-  }
+  .tab-cta .tab-icon { color: white; stroke: white; }
 
   .tab-cta.router-link-active,
   .tab-cta.active {
     background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
-    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    box-shadow: 0 6px 20px rgba(76,175,80,0.4);
   }
 }
 
-/* ══════════════════════════════════════════════
-   小屏手机 ≤480px
-   ══════════════════════════════════════════════ */
 @media (max-width: 480px) {
-  .hero-banner {
-    border-radius: 14px;
-  }
-
-  .teachers-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-
-  .teacher-card {
-    padding: 16px 10px;
-  }
-
-  .teacher-avatar {
-    width: 72px; height: 72px;
-  }
-
+  .hero-banner { border-radius: 14px; }
+  .teachers-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .teacher-card { padding: 16px 10px; }
+  .teacher-avatar { width: 72px; height: 72px; }
   .teacher-name { font-size: 14px; }
   .teacher-title { font-size: 12px; }
   .teacher-desc { font-size: 11px; }
-
   .section-title { font-size: 18px; }
-
-  .why-content {
-    padding: 20px 16px;
-  }
-
+  .why-content { padding: 20px 16px; }
   .md-text { font-size: 14px; }
   .md-text h3 { font-size: 16px; }
 }
