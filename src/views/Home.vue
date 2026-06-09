@@ -9,6 +9,7 @@ import { useLanguage } from '../composables/useLanguage';
 import { useBannerCarousel } from '../composables/useBannerCarousel';
 import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml, fetchJson } from '../utils';
 import DomeGallery from '../components/DomeGallery.vue';
+import Grainient from '../components/Grainient.vue';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -327,6 +328,25 @@ const siteTitle = computed(() => {
 
 <template>
   <div id="home-root">
+    <!-- Background -->
+    <Grainient
+      color1="#4CAF50"
+      color2="#1a73e8"
+      color3="#2e7d32"
+      :timeSpeed="0.3"
+      :warpStrength="1.2"
+      :warpFrequency="6"
+      :warpSpeed="2.5"
+      :warpAmplitude="60"
+      :blendSoftness="0.1"
+      :rotationAmount="400"
+      :contrast="1.3"
+      :gamma="0.95"
+      :saturation="0.8"
+      :zoom="0.9"
+      class="page-bg"
+    />
+
     <!-- Loading -->
     <div v-if="loading" class="global-loading">
       <div class="spinner"></div>
@@ -528,43 +548,25 @@ const siteTitle = computed(() => {
 }
 
 /* ══════════════════════════════════════════════
+   Page background (Grainient)
+   ══════════════════════════════════════════════ */
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════
    桌面端基础样式
    ══════════════════════════════════════════════ */
 .page-container {
   min-height: 100vh;
-  background: #ffffff;
+  background: transparent;
   position: relative;
+  z-index: 1;
   overflow-x: hidden;
-}
-
-.page-container::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-container::after {
-  content: '';
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background:
-    radial-gradient(circle at 20% 80%, rgba(255,182,193,0.25) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(173,216,230,0.25) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(221,160,221,0.2) 0%, transparent 50%),
-    radial-gradient(circle at 60% 60%, rgba(255,228,181,0.2) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
-  animation: float 25s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
 }
 
 /* ── 顶部导航 ── */
