@@ -111,6 +111,8 @@ const galleryTitleRef = ref<HTMLElement | null>(null);
 const galleryGridRef = ref<HTMLElement | null>(null);
 const curtainRef = ref<HTMLElement | null>(null);
 
+const shouldAnimate = !sessionStorage.getItem('home_animated');
+
 let ctx: gsap.Context | null = null;
 
 function initAnimations() {
@@ -118,53 +120,65 @@ function initAnimations() {
     const isMobile = window.innerWidth < 769;
     const mm = ScrollTrigger.matchMedia();
 
-    // ── Opening animation ──
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    if (shouldAnimate) {
+      // ── Opening animation (only on fresh page load) ──
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
-    // Curtain slides up
-    if (curtainRef.value) {
-      tl.to(curtainRef.value, {
-        y: '-100%',
-        duration: 1.4,
-        ease: 'power4.inOut',
-      });
-    }
+      // Curtain slides up
+      if (curtainRef.value) {
+        tl.to(curtainRef.value, {
+          y: '-100%',
+          duration: 1.4,
+          ease: 'power4.inOut',
+        });
+      }
 
-    // Hero title: compress-restore entrance
-    if (heroTitleRef.value) {
-      tl.fromTo(heroTitleRef.value,
-        { scaleX: 0.6, scaleY: 1.4, y: 60, opacity: 0 },
-        { scaleX: 1, scaleY: 1, y: 0, opacity: 1, duration: 1.2, ease: 'power4.out' },
-        '-=0.6'
-      );
-    }
+      // Hero title: compress-restore entrance
+      if (heroTitleRef.value) {
+        tl.fromTo(heroTitleRef.value,
+          { scaleX: 0.6, scaleY: 1.4, y: 60, opacity: 0 },
+          { scaleX: 1, scaleY: 1, y: 0, opacity: 1, duration: 1.2, ease: 'power4.out' },
+          '-=0.6'
+        );
+      }
 
-    // Hero subtitle
-    if (heroSubRef.value) {
-      tl.fromTo(heroSubRef.value,
-        { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.9, ease: 'power2.out' },
-        '-=0.4'
-      );
-    }
+      // Hero subtitle
+      if (heroSubRef.value) {
+        tl.fromTo(heroSubRef.value,
+          { y: 30, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.9, ease: 'power2.out' },
+          '-=0.4'
+        );
+      }
 
-    // Banner fade in
-    if (heroRef.value) {
-      tl.fromTo(heroRef.value.querySelector('.hero-banner-wrapper'),
-        { opacity: 0, scale: 0.95 },
-        { opacity: 1, scale: 1, duration: 1.2, ease: 'power2.out' },
-        '-=0.5'
-      );
-    }
+      // Banner fade in
+      if (heroRef.value) {
+        tl.fromTo(heroRef.value.querySelector('.hero-banner-wrapper'),
+          { opacity: 0, scale: 0.95 },
+          { opacity: 1, scale: 1, duration: 1.2, ease: 'power2.out' },
+          '-=0.5'
+        );
+      }
 
-    // Hero text fades out after banner appears
-    if (heroTextOverlayRef.value) {
-      tl.to(heroTextOverlayRef.value, {
-        opacity: 0,
-        y: -20,
-        duration: 0.5,
-        ease: 'power2.in',
-      }, '-=0.3');
+      // Hero text fades out after banner appears
+      if (heroTextOverlayRef.value) {
+        tl.to(heroTextOverlayRef.value, {
+          opacity: 0,
+          y: -20,
+          duration: 0.5,
+          ease: 'power2.in',
+        }, '-=0.3');
+      }
+    } else {
+      // SPA navigation — no welcome animation, show final state immediately
+      if (curtainRef.value) curtainRef.value.style.display = 'none';
+      if (heroTextOverlayRef.value) {
+        gsap.set(heroTextOverlayRef.value, { opacity: 0 });
+      }
+      if (heroRef.value) {
+        const wrapper = heroRef.value.querySelector('.hero-banner-wrapper');
+        if (wrapper) gsap.set(wrapper, { opacity: 1, scale: 1 });
+      }
     }
 
     // ── Scroll-triggered: Why section ──
@@ -251,44 +265,7 @@ function initAnimations() {
         );
       }
     } else {
-      // Mobile: animate curtain then show content
-      if (curtainRef.value) {
-        tl.to(curtainRef.value, {
-          y: '-100%',
-          duration: 1.2,
-          ease: 'power4.inOut',
-        });
-      }
-      if (heroTitleRef.value) {
-        tl.fromTo(heroTitleRef.value,
-          { scaleX: 0.6, scaleY: 1.4, y: 40, opacity: 0 },
-          { scaleX: 1, scaleY: 1, y: 0, opacity: 1, duration: 1, ease: 'power4.out' },
-          '-=0.6'
-        );
-      }
-      if (heroSubRef.value) {
-        tl.fromTo(heroSubRef.value,
-          { y: 20, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.7, ease: 'power2.out' },
-          '-=0.4'
-        );
-      }
-      if (heroRef.value) {
-        tl.fromTo(heroRef.value.querySelector('.hero-banner-wrapper'),
-          { opacity: 0, scale: 0.95 },
-          { opacity: 1, scale: 1, duration: 1, ease: 'power2.out' },
-          '-=0.5'
-        );
-      }
-      // Fade out hero text after banner appears
-      if (heroTextOverlayRef.value) {
-        tl.to(heroTextOverlayRef.value, {
-          opacity: 0,
-          y: -20,
-          duration: 0.5,
-          ease: 'power2.in',
-        }, '-=0.3');
-      }
+      // Mobile: no scroll-triggered animations
     }
 
     ScrollTrigger.refresh();
@@ -299,6 +276,7 @@ onMounted(async () => {
   await loadData();
   await nextTick();
   initAnimations();
+  if (shouldAnimate) sessionStorage.setItem('home_animated', 'true');
   window.addEventListener('scroll', updateNavVisibility);
   updateNavVisibility();
 });
