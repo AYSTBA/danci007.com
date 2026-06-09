@@ -102,6 +102,7 @@ const getBannerTitle = (banner: Banner) => {
 
 // ── Animation refs ──
 const heroRef = ref<HTMLElement | null>(null);
+const heroTextOverlayRef = ref<HTMLElement | null>(null);
 const heroTitleRef = ref<HTMLElement | null>(null);
 const heroSubRef = ref<HTMLElement | null>(null);
 const whySectionRef = ref<HTMLElement | null>(null);
@@ -159,6 +160,17 @@ function initAnimations() {
         { opacity: 1, scale: 1, duration: 1.2, ease: 'power2.out' },
         '-=0.5'
       );
+    }
+
+    // Hero text fades out after banner appears
+    if (heroTextOverlayRef.value) {
+      tl.to(heroTextOverlayRef.value, {
+        opacity: 0,
+        y: -20,
+        duration: 0.8,
+        ease: 'power2.in',
+        delay: 1.5,
+      }, '-=0.3');
     }
 
     // ── Scroll-triggered: Why section ──
@@ -380,7 +392,7 @@ const siteTitle = computed(() => {
 
       <!-- Banner 轮播 -->
       <section ref="heroRef" id="hero" class="hero-section">
-        <div class="hero-text-overlay">
+        <div ref="heroTextOverlayRef" class="hero-text-overlay">
           <h1 ref="heroTitleRef" class="hero-main-title">
             {{ currentLang === 'zh'
               ? (pageContents.hero_title || '欢迎来到深圳市龙岗区教学点')
