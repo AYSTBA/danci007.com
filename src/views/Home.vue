@@ -1135,9 +1135,8 @@ const siteTitle = computed(() => {
 
   .hero-section {
     padding-top: 0;
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding-bottom: 0;
+    min-height: auto;
+    padding-bottom: 24px;
     flex-direction: column;
   }
 
