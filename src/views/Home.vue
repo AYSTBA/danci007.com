@@ -114,24 +114,6 @@ const gallerySectionRef = ref<HTMLElement | null>(null);
 const galleryTitleRef = ref<HTMLElement | null>(null);
 const galleryGridRef = ref<HTMLElement | null>(null);
 const curtainRef = ref<HTMLElement | null>(null);
-const showWelcome = ref(true);
-const welcomeRef = ref<HTMLElement | null>(null);
-const welcomeDismissed = ref(false);
-
-function dismissWelcome() {
-  if (welcomeDismissed.value) return;
-  welcomeDismissed.value = true;
-  if (welcomeRef.value) {
-    gsap.to(welcomeRef.value, {
-      y: '-100%',
-      duration: 0.8,
-      ease: 'power3.inOut',
-      onComplete: () => { showWelcome.value = false; }
-    });
-  } else {
-    showWelcome.value = false;
-  }
-}
 
 let ctx: gsap.Context | null = null;
 
@@ -315,40 +297,12 @@ onMounted(async () => {
   await loadData();
   await nextTick();
   initAnimations();
-
-  // Welcome overlay dismiss on scroll/touch
-  const handleWheel = (e: WheelEvent) => {
-    if (welcomeDismissed.value) return;
-    if (e.deltaY > 0) dismissWelcome();
-  };
-  const handleTouchStart = (e: TouchEvent) => {
-    if (welcomeDismissed.value) return;
-    (window as any)._welcomeTouchY = e.touches[0].clientY;
-  };
-  const handleTouchMove = (e: TouchEvent) => {
-    if (welcomeDismissed.value) return;
-    const startY = (window as any)._welcomeTouchY;
-    if (startY != null) {
-      const dy = startY - e.touches[0].clientY;
-      if (dy > 10) dismissWelcome();
-    }
-  };
-  window.addEventListener('wheel', handleWheel, { passive: true });
-  window.addEventListener('touchstart', handleTouchStart, { passive: true });
-  window.addEventListener('touchmove', handleTouchMove, { passive: true });
-  (window as any).__welcomeCleanup = () => {
-    window.removeEventListener('wheel', handleWheel);
-    window.removeEventListener('touchstart', handleTouchStart);
-    window.removeEventListener('touchmove', handleTouchMove);
-  };
-
   window.addEventListener('scroll', updateNavVisibility);
   updateNavVisibility();
 });
 
 onUnmounted(() => {
   if (ctx) ctx.revert();
-  if ((window as any).__welcomeCleanup) (window as any).__welcomeCleanup();
   window.removeEventListener('scroll', updateNavVisibility);
   stopAutoPlay();
 });
@@ -389,21 +343,6 @@ const siteTitle = computed(() => {
     <div v-else class="page-container">
       <!-- Curtain overlay -->
       <div ref="curtainRef" class="curtain-overlay"></div>
-
-      <!-- Welcome overlay -->
-      <div v-if="showWelcome" ref="welcomeRef" class="welcome-overlay" @click="dismissWelcome">
-        <div class="welcome-content">
-          <div class="welcome-badge">中萱文化</div>
-          <h1 class="welcome-title">欢迎来到<br/>深圳市龙岗区教学点</h1>
-          <p class="welcome-subtitle">单词突击007 · 智能单词学习系统</p>
-          <div class="welcome-divider"></div>
-          <p class="welcome-hint">
-            <span class="welcome-arrow">⌄</span>
-            <span>上滑进入</span>
-            <span class="welcome-arrow">⌄</span>
-          </p>
-        </div>
-      </div>
 
       <!-- 顶部导航栏 -->
       <header class="page-header" :class="{ 'nav-hidden': !isNavVisible }">
@@ -592,105 +531,6 @@ const siteTitle = computed(() => {
   background: #1a1a2e;
   z-index: 999;
   pointer-events: none;
-}
-
-/* ══════════════════════════════════════════════
-   Welcome overlay
-   ══════════════════════════════════════════════ */
-.welcome-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 1000;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.welcome-overlay::before {
-  content: '';
-  position: absolute;
-  top: -50%; left: -50%;
-  width: 200%; height: 200%;
-  background:
-    radial-gradient(circle at 30% 40%, rgba(76, 175, 80, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 70% 60%, rgba(100, 181, 246, 0.12) 0%, transparent 40%),
-    radial-gradient(circle at 50% 80%, rgba(255, 183, 77, 0.08) 0%, transparent 30%);
-  animation: welcomeFloat 20s ease-in-out infinite;
-}
-
-@keyframes welcomeFloat {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(30px, -30px) rotate(1deg); }
-  66% { transform: translate(-20px, 20px) rotate(-1deg); }
-}
-
-.welcome-content {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 40px;
-  max-width: 600px;
-}
-
-.welcome-badge {
-  display: inline-block;
-  padding: 6px 20px;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 20px;
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.6);
-  letter-spacing: 4px;
-  margin-bottom: 40px;
-  text-transform: uppercase;
-}
-
-.welcome-title {
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  font-weight: 700;
-  color: white;
-  line-height: 1.4;
-  margin: 0 0 20px;
-  letter-spacing: 3px;
-}
-
-.welcome-subtitle {
-  font-size: clamp(1rem, 2vw, 1.3rem);
-  color: rgba(255,255,255,0.6);
-  letter-spacing: 6px;
-  margin: 0 0 30px;
-  font-weight: 300;
-}
-
-.welcome-divider {
-  width: 60px;
-  height: 1px;
-  background: rgba(255,255,255,0.3);
-  margin: 0 auto 30px;
-}
-
-.welcome-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: rgba(255,255,255,0.4);
-  font-size: 0.9rem;
-  letter-spacing: 3px;
-  animation: welcomeBounce 2s ease-in-out infinite;
-}
-
-.welcome-arrow {
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
-@keyframes welcomeBounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(6px); }
 }
 
 /* ══════════════════════════════════════════════
