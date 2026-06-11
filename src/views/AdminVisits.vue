@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchJson } from '../utils';
+import Grainient from '../components/Grainient.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -313,6 +314,31 @@ watch(() => route.query.refresh, () => {
 </script>
 
 <template>
+  <Grainient
+    color1="#c1c2c1"
+    color2="#6ad67b"
+    color3="#5584cf"
+    :timeSpeed="1"
+    :colorBalance="0"
+    :warpStrength="0.8"
+    :warpFrequency="5"
+    :warpSpeed="1.9"
+    :warpAmplitude="50"
+    :blendAngle="0"
+    :blendSoftness="0.38"
+    :rotationAmount="850"
+    :noiseScale="2"
+    :grainAmount="0"
+    :grainScale="2"
+    :grainAnimated="false"
+    :contrast="1.55"
+    :gamma="0.95"
+    :saturation="0.95"
+    :centerX="0.09"
+    :centerY="0"
+    :zoom="0.85"
+    class="page-bg"
+  />
   <div class="admin-visits-page">
     <!-- 顶部导航 -->
     <header class="page-header">
@@ -711,7 +737,7 @@ watch(() => route.query.refresh, () => {
 </template>
 
 <style scoped>
-.admin-visits-page { min-height: 100vh; background: linear-gradient(135deg, #f0faf0 0%, #f5f7fa 50%, #e8f5e9 100%); }
+.admin-visits-page { min-height: 100vh; background: transparent; position: relative; z-index: 1; }
 
 .page-header { background: rgba(255,255,255,0.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.2rem 0; position: sticky; top: 0; z-index: 100; }
 .page-header .container { max-width: 1400px; margin: 0 auto; padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -898,5 +924,16 @@ watch(() => route.query.refresh, () => {
   .filter-row input, .filter-row select { min-width: 0; flex: 1; }
   .header-right .link-back { display: none; }
   .visit-table { min-width: 800px; }
+}
+
+/* ══════════════════════════════════════════════
+   Page background
+   ══════════════════════════════════════════════ */
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 </style>

@@ -5,6 +5,7 @@ import ImageEditor from '../components/ImageEditor.vue';
 import type { BookingData, Banner, Teacher, PageContents } from '../types';
 import { normalizeActive } from '../types';
 import { getImageUrl, formatDate, fetchJson } from '../utils';
+import Grainient from '../components/Grainient.vue';
 
 const router = useRouter();
 
@@ -700,6 +701,31 @@ onMounted(() => {
 </script>
 
 <template>
+  <Grainient
+    color1="#c1c2c1"
+    color2="#6ad67b"
+    color3="#5584cf"
+    :timeSpeed="1"
+    :colorBalance="0"
+    :warpStrength="0.8"
+    :warpFrequency="5"
+    :warpSpeed="1.9"
+    :warpAmplitude="50"
+    :blendAngle="0"
+    :blendSoftness="0.38"
+    :rotationAmount="850"
+    :noiseScale="2"
+    :grainAmount="0"
+    :grainScale="2"
+    :grainAnimated="false"
+    :contrast="1.55"
+    :gamma="0.95"
+    :saturation="0.95"
+    :centerX="0.09"
+    :centerY="0"
+    :zoom="0.85"
+    class="page-bg"
+  />
   <div class="admin-page">
     <div v-if="!isLoggedIn" class="login-container">
       <div class="login-box">
@@ -1241,7 +1267,7 @@ onMounted(() => {
 
 <style scoped>
 /* Admin 页面样式保持不变，与原版一致 */
-.admin-page { min-height: 100vh; background: linear-gradient(135deg, #f0faf0 0%, #f5f7fa 50%, #e8f5e9 100%); }
+.admin-page { min-height: 100vh; background: transparent; position: relative; z-index: 1; }
 
 .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
 .login-box { background: rgba(255,255,255,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.7); padding: 3rem; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
@@ -1583,5 +1609,16 @@ onMounted(() => {
   .dist-row { grid-template-columns: 100px 1fr 30px; font-size: 12px; }
   .stat-value { font-size: 22px; }
   .filter-row input, .filter-row select { min-width: 0; flex: 1; }
+}
+
+/* ══════════════════════════════════════════════
+   Page background
+   ══════════════════════════════════════════════ */
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 </style>
