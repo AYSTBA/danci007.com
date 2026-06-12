@@ -535,7 +535,7 @@ function onEsc(e: KeyboardEvent) {
               :aria-label="it.alt || 'Open image'"
               @click="(e: MouseEvent) => onTileClick(e, $event.currentTarget as HTMLElement)"
             >
-              <img :src="it.src" draggable="false" :alt="it.alt" />
+              <img :src="it.src" draggable="false" :alt="it.alt" loading="lazy" />
             </div>
           </div>
         </div>

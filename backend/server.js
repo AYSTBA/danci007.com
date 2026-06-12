@@ -41,6 +41,66 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '5mb' }));
 
+// ── 缓存中间件 ──
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+function setCache(key, data) {
+  cache.set(key, { data, t: Date.now() + CACHE_TTL });
+}
+function getCache(key) {
+  const entry = cache.get(key);
+  if (entry && Date.now() < entry.t) return entry.data;
+  cache.delete(key);
+  return null;
+}
+function clearCache(pattern) {
+  for (const key of cache.keys()) {
+    if (key.startsWith(pattern)) cache.delete(key);
+  }
+}
+
+// ── 静态 API 响应缓存 ──
+function cachePublicAPI(req, res, next) {
+  const cached = getCache(req.originalUrl);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    return res.json(cached);
+  }
+  res.setHeader('X-Cache', 'MISS');
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode < 400) {
+      setCache(req.originalUrl, body);
+      res.setHeader('Cache-Control', 'public, max-age=60');
+    }
+    return originalJson(body);
+  };
+  next();
+}
+
+// ── gzip 响应压缩 (fallback，nginx 会优先处理) ──
+import { createGzip } from 'zlib';
+app.use((req, res, next) => {
+  const accept = req.headers['accept-encoding'] || '';
+  if (accept.includes('gzip') && !req.url.startsWith('/api/')) {
+    const gzip = createGzip();
+    res.setHeader('Content-Encoding', 'gzip');
+    const _end = res.end.bind(res);
+    const _write = res.write.bind(res);
+    const chunks = [];
+    res.write = (chunk) => { chunks.push(chunk); return true; };
+    res.end = (chunk) => {
+      if (chunk) chunks.push(chunk);
+      const body = Buffer.concat(chunks);
+      gzip.end(body);
+    };
+    gzip.on('data', (c) => _write(c));
+    gzip.on('end', () => _end());
+  }
+  next();
+});
+
 // ── 登录频率限制 ──
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -660,6 +720,7 @@ const initDb = () => {
     );
     CREATE INDEX IF NOT EXISTS idx_visit_time ON page_visits(visit_time DESC);
     CREATE INDEX IF NOT EXISTS idx_visit_ip ON page_visits(ip);
+    CREATE INDEX IF NOT EXISTS idx_courses_active ON courses(active, sort_order);
   `);
   // 兼容老表: 添加新列
   try { db.exec(`ALTER TABLE page_visits ADD COLUMN suspicious TEXT DEFAULT ''`); } catch { /* 已存在 */ }
@@ -704,7 +765,7 @@ const initDb = () => {
 
 initDb();
 
-app.get('/api/pages/home', (req, res) => {
+app.get('/api/pages/home', cachePublicAPI, (req, res) => {
   const rows = db.prepare('SELECT key, value FROM page_contents').all();
   const result = {};
   for (const row of rows) {
@@ -713,7 +774,7 @@ app.get('/api/pages/home', (req, res) => {
   res.json(result);
 });
 
-app.get('/api/pages/home/contents', (req, res) => {
+app.get('/api/pages/home/contents', cachePublicAPI, (req, res) => {
   const rows = db.prepare('SELECT key, value FROM page_contents').all();
   const result = {};
   for (const row of rows) {
@@ -730,10 +791,11 @@ app.put('/api/pages/home/contents', requireAdminAuth, (req, res) => {
     updateStmt.run(key, value);
   }
   
+  clearCache('/api/pages');
   res.json({ success: true });
 });
 
-app.get('/api/banners', (req, res) => {
+app.get('/api/banners', cachePublicAPI, (req, res) => {
   const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC').all();
   res.json(banners);
 });
@@ -751,6 +813,7 @@ app.post('/api/banners', requireAdminAuth, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(title || '', title_en || '', image_url || '', image_url_en || '', link || '', active !== undefined ? active : 1, sort_order || 0);
     
+    clearCache('/api/banners');
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     console.error('Error creating banner:', error);
@@ -789,7 +852,7 @@ app.delete('/api/banners/:id', requireAdminAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/teachers', (req, res) => {
+app.get('/api/teachers', cachePublicAPI, (req, res) => {
   const teachers = db.prepare('SELECT * FROM teachers WHERE active = 1 ORDER BY sort_order ASC').all();
   res.json(teachers);
 });
@@ -969,7 +1032,7 @@ app.post('/api/admin/orphan-uploads', requireAdminAuth, (req, res) => {
 // ── 课程招生页 API ──
 
 // 课程列表（公开接口）
-app.get('/api/courses', (req, res) => {
+app.get('/api/courses', cachePublicAPI, (req, res) => {
   try {
     const courses = db.prepare('SELECT * FROM courses WHERE active = 1 ORDER BY sort_order ASC, created_at DESC').all();
     res.json(courses);
@@ -978,7 +1041,7 @@ app.get('/api/courses', (req, res) => {
   }
 });
 
-app.get('/api/courses/:id', (req, res) => {
+app.get('/api/courses/:id', cachePublicAPI, (req, res) => {
   const course = db.prepare('SELECT * FROM courses WHERE course_id = ? AND active = 1').get(req.params.id);
   if (!course) {
     return res.status(404).json({ error: 'Course not found' });
@@ -1018,6 +1081,7 @@ app.post('/api/courses', requireAdminAuth, (req, res) => {
       lesson_count || '1', student_count || '0', status || '已完结', validity || '长期有效',
       Number(sort_order) || 0, active !== undefined ? active : 1
     );
+    clearCache('/api/courses');
     res.json({ id: result.lastInsertRowid });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1056,6 +1120,7 @@ app.put('/api/courses/:id', requireAdminAuth, (req, res) => {
       lesson_count, student_count, status, validity, sort_order,
       active, id
     );
+    clearCache('/api/courses');
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1064,6 +1129,7 @@ app.put('/api/courses/:id', requireAdminAuth, (req, res) => {
 
 app.delete('/api/courses/:id', requireAdminAuth, (req, res) => {
   db.prepare('DELETE FROM courses WHERE id = ?').run(Number(req.params.id));
+  clearCache('/api/courses');
   res.json({ success: true });
 });
 

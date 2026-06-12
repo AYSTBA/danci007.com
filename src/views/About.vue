@@ -168,6 +168,7 @@ onUnmounted(stopBannerAutoPlay)
             :src="getImageUrl(currentLang === 'en' && banner.image_url_en ? banner.image_url_en : banner.image_url)"
             :alt="currentLang === 'en' && banner.title_en ? banner.title_en : banner.title"
             :class="['banner-img', { active: index === currentBannerIndex }]"
+            fetchpriority="high"
           />
           <div v-if="banners.length === 0" class="banner-placeholder">
             <span>{{ currentLang === 'zh' ? '活动展示' : 'Activity Display' }}</span>

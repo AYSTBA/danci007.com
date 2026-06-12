@@ -409,6 +409,7 @@ const siteTitle = computed(() => {
                 :alt="getBannerTitle(banner)"
                 :class="['banner-img', { active: index === currentBannerIndex }]"
                 draggable="false"
+                fetchpriority="high"
               />
               <div v-if="banners.length === 0" class="banner-placeholder">
                 <span>{{ currentLang === 'zh' ? '活动图片' : 'Activity Image' }}</span>
@@ -469,6 +470,7 @@ const siteTitle = computed(() => {
                   :src="getAvatarUrl(teacher.avatar)"
                   :alt="currentLang === 'zh' ? teacher.name : teacher.name_en"
                   @error="($event.target as HTMLImageElement).src = getAvatarUrl('')"
+                  loading="lazy"
                 />
               </div>
               <h3 class="teacher-name">{{ currentLang === 'zh' ? teacher.name : teacher.name_en }}</h3>

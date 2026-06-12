@@ -277,6 +277,7 @@ onMounted(() => {
                 :src="getImageUrl(c.banner_image)"
                 :alt="c.name"
                 @error="handleListImgError"
+                loading="lazy"
               />
               <div v-else class="card-banner-placeholder">
                 <span>{{ t(c.name, c.name_en).slice(0, 8) }}</span>
@@ -295,6 +296,7 @@ onMounted(() => {
                     v-if="c.teacher_avatar"
                     :src="getAvatarUrl(c.teacher_avatar)"
                     @error="handleListImgError"
+                    loading="lazy"
                   />
                   <div v-else class="card-avatar-placeholder">
                     {{ t(c.teacher_name, c.teacher_name_en).charAt(0) }}
@@ -353,7 +355,7 @@ onMounted(() => {
         </header>
 
         <div class="banner">
-          <img v-if="course.banner_image" :src="getImageUrl(course.banner_image)" class="banner-img" @error="handleImgError" />
+          <img v-if="course.banner_image" :src="getImageUrl(course.banner_image)" class="banner-img" @error="handleImgError" fetchpriority="high" />
           <div v-else class="banner-placeholder">
             <div class="banner-inner">
               <span class="banner-tag">{{ t('中萱书店', 'Zhongxuan') }}</span>
@@ -393,7 +395,7 @@ onMounted(() => {
               <p class="teacher-lesson-count">{{ t('本课程共', 'Total') }}{{ course.lesson_count || '1' }}{{ t('课时', ' lessons') }}</p>
             </div>
             <div class="teacher-avatar">
-              <img v-if="course.teacher_avatar" :src="getAvatarUrl(course.teacher_avatar)" @error="handleImgError" />
+              <img v-if="course.teacher_avatar" :src="getAvatarUrl(course.teacher_avatar)" @error="handleImgError" loading="lazy" />
               <div v-else class="avatar-placeholder">
                 <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--text-light)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
               </div>
