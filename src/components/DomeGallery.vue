@@ -68,6 +68,9 @@ let lastDragEndAt = 0;
 let focusedEl: HTMLElement | null = null;
 let originalTilePosition: { left: number; top: number; width: number; height: number } | null = null;
 let scrollLocked = false;
+let resizeObserver: ResizeObserver | null = null;
+const pointerHistory: { x: number; y: number; t: number }[] = [];
+const MAX_POINTER_HISTORY = 5;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 const normalizeAngle = (d: number) => ((d % 360) + 360) % 360;
@@ -168,10 +171,11 @@ function startInertia(vx: number, vy: number) {
   let vX = clamp(vx, -MAX_V, MAX_V) * 80;
   let vY = clamp(vy, -MAX_V, MAX_V) * 80;
   let frames = 0;
-  const d = clamp(props.dragDampening ?? 0.6, 0, 1);
-  const frictionMul = 0.94 + 0.055 * d;
-  const stopThreshold = 0.015 - 0.01 * d;
-  const maxFrames = Math.round(90 + 270 * d);
+  const d = clamp(props.dragDampening ?? 1, 0, 10);
+  const t = Math.min(d, 1);
+  const frictionMul = 0.94 + 0.055 * t;
+  const stopThreshold = 0.015 - 0.01 * t;
+  const maxFrames = Math.round(90 + 270 * t);
   stopInertia();
   const step = () => {
     vX *= frictionMul;
@@ -201,7 +205,7 @@ function onPointerDown(e: PointerEvent) {
   moved.value = false;
   startRot.value = { ...rotation.value };
   startPos.value = { x: e.clientX, y: e.clientY };
-  (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+  mainRef.value?.setPointerCapture?.(e.pointerId);
 }
 
 function onPointerMove(e: PointerEvent) {
@@ -217,13 +221,28 @@ function onPointerMove(e: PointerEvent) {
     rotation.value = { x: nextX, y: nextY };
     applyTransform(nextX, nextY);
   }
+  pointerHistory.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+  if (pointerHistory.length > MAX_POINTER_HISTORY) pointerHistory.shift();
 }
 
 function onPointerUp(e: PointerEvent) {
   if (!dragging.value) return;
   dragging.value = false;
-  const vx = (e as any).velocityX ?? 0;
-  const vy = (e as any).velocityY ?? 0;
+  let vx = 0, vy = 0;
+  if (pointerHistory.length >= 2) {
+    const now = performance.now();
+    const recent = pointerHistory.filter(p => now - p.t < 100);
+    if (recent.length >= 2) {
+      const first = recent[0];
+      const last = recent[recent.length - 1];
+      const dt = last.t - first.t;
+      if (dt > 0) {
+        vx = (last.x - first.x) / dt;
+        vy = (last.y - first.y) / dt;
+      }
+    }
+  }
+  pointerHistory.length = 0;
   if (Math.abs(vx) > 0.005 || Math.abs(vy) > 0.005) {
     startInertia(vx, vy);
   }
@@ -452,6 +471,7 @@ onMounted(() => {
     applyTransform(rotation.value.x, rotation.value.y);
   });
   ro.observe(root);
+  resizeObserver = ro;
 
   window.addEventListener('keydown', onEsc);
 });
@@ -460,6 +480,7 @@ onUnmounted(() => {
   document.body.classList.remove('dg-scroll-lock');
   window.removeEventListener('keydown', onEsc);
   if (inertiaRAF !== null) cancelAnimationFrame(inertiaRAF);
+  if (resizeObserver) resizeObserver.disconnect();
 });
 
 function onEsc(e: KeyboardEvent) {
@@ -487,6 +508,7 @@ function onEsc(e: KeyboardEvent) {
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
     >
       <div class="stage">
         <div ref="sphereRef" class="sphere">
@@ -568,7 +590,7 @@ main.sphere-main {
   display: grid;
   place-items: center;
   overflow: hidden;
-  touch-action: pan-y pinch-zoom;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   background: transparent;

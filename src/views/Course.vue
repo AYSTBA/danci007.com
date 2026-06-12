@@ -104,8 +104,6 @@ const loadDetail = async () => {
     };
   } finally {
     loading.value = false;
-    loadReviews();
-    loadInteractions();
   }
 };
 

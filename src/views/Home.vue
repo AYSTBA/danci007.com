@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Banner, PageContents, Teacher } from '../types';
@@ -13,7 +12,6 @@ import Grainient from '../components/Grainient.vue';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const router = useRouter();
 const { currentLang, showLangDropdown, toggleLanguage, selectLanguage } = useLanguage();
 
 const banners = ref<Banner[]>([]);
@@ -121,7 +119,6 @@ let ctx: gsap.Context | null = null;
 function initAnimations() {
   ctx = gsap.context(() => {
     const isMobile = window.innerWidth < 769;
-    const mm = ScrollTrigger.matchMedia();
 
     if (shouldAnimate) {
       // ── Opening animation (only on fresh page load) ──
