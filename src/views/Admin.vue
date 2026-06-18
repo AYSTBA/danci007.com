@@ -35,6 +35,20 @@ const editorCallback = ref<((file: File) => void) | null>(null);
 // 互动管理
 const courseReviews = ref<any[]>([]);
 const courseInteractions = ref<any[]>([]);
+const groupBuys = ref<any[]>([]);
+const expandedGroupBuys = ref(new Set<number>());
+
+const toggleGroupBuy = (id: number) => {
+  const s = expandedGroupBuys.value;
+  if (s.has(id)) s.delete(id); else s.add(id);
+  expandedGroupBuys.value = new Set(s);
+};
+
+async function loadGroupBuys() {
+  try {
+    groupBuys.value = await fetchJson<any[]>('/api/admin/group-buys');
+  } catch {}
+}
 
 // 课程管理
 const courses = ref<any[]>([]);
@@ -164,14 +178,15 @@ const loadData = async () => {
   dataError.value = null;
   try {
     const headers = getAuthHeaders();
-    const [bookingsData, bannerData, contents, teacherData, reviewsData, interactionsData, coursesData] = await Promise.all([
+    const [bookingsData, bannerData, contents, teacherData, reviewsData, interactionsData, coursesData, groupBuysData] = await Promise.all([
       fetchJson<BookingData[]>('/api/bookings', { headers }),
       fetchJson<Banner[]>('/api/admin/banners', { headers }),
       fetchJson<PageContents>('/api/pages/home/contents', { headers }),
       fetchJson<Teacher[]>('/api/teachers', { headers }),
       fetchJson<any[]>('/api/admin/course-reviews', { headers }),
       fetchJson<any[]>('/api/admin/course-interactions', { headers }),
-      fetchJson<any[]>('/api/admin/courses', { headers })
+      fetchJson<any[]>('/api/admin/courses', { headers }),
+      fetchJson<any[]>('/api/admin/group-buys', { headers })
     ]);
 
     bookings.value = bookingsData;
@@ -181,6 +196,7 @@ const loadData = async () => {
     courseReviews.value = reviewsData;
     courseInteractions.value = interactionsData;
     courses.value = coursesData.map((c: any) => ({ ...c, active: normalizeActive(c.active) }));
+    groupBuys.value = groupBuysData;
   } catch (e: any) {
     // 如果鉴权失败，自动登出
     if (e.message?.includes('401') || e.message?.includes('403')) {
@@ -799,6 +815,7 @@ onMounted(() => {
             <button :class="['tab', { active: activeTab === 'teachers' }]" @click="activeTab = 'teachers'">师资力量管理</button>
             <button :class="['tab', { active: activeTab === 'reviews' }]" @click="activeTab = 'reviews'">课程评价</button>
             <button :class="['tab', { active: activeTab === 'interactions' }]" @click="activeTab = 'interactions'">课程互动</button>
+            <button :class="['tab', { active: activeTab === 'groupbuys' }]" @click="activeTab = 'groupbuys'">团购管理</button>
             <button class="tab tab-nav" @click="router.push('/admin/visits')">📊 访客分析</button>
             <button class="tab tab-nav" @click="router.push('/admin/server')">🖥 服务器</button>
           </div>
@@ -1230,6 +1247,31 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- Group Buys Tab -->
+          <div v-show="activeTab === 'groupbuys'" class="tab-content">
+            <div class="section-header" style="margin-bottom:20px">
+              <h2>团购管理</h2>
+              <button class="btn-primary" @click="loadGroupBuys" style="padding:8px 20px;font-size:0.85rem">刷新</button>
+            </div>
+            <div v-if="groupBuys.length === 0" class="empty-state"><p>暂无团购记录</p></div>
+            <div v-for="session in groupBuys" :key="session.id" class="gb-tree-node">
+              <div class="gb-tree-header" @click="toggleGroupBuy(session.id)">
+                <span class="gb-tree-toggle">{{ expandedGroupBuys.has(session.id) ? '▼' : '▶' }}</span>
+                <span class="gb-tree-creator">👤 {{ session.creator_name }}</span>
+                <span class="gb-tree-meta">课程 {{ session.course_id }} · 👥 {{ session.participants?.length || 0 }}人 · 🎁 +{{ session.total_bonus || 0 }}</span>
+                <span class="gb-tree-time">{{ new Date(session.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric' }) }}</span>
+              </div>
+              <div v-if="expandedGroupBuys.has(session.id)" class="gb-tree-children">
+                <div v-for="p in session.participants" :key="p.id" class="gb-tree-leaf">
+                  <span class="gb-leaf-name">👤 {{ p.user_name }}</span>
+                  <span class="gb-leaf-phone">{{ p.user_phone || '—' }}</span>
+                  <span class="gb-leaf-bonus">+{{ p.lesson_bonus }}</span>
+                  <span class="gb-leaf-time">{{ new Date(p.joined_at).toLocaleString('zh-CN') }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 访客分析已迁移到 /admin/visits 独立子路由 -->
         </div>
       </section>
@@ -1266,6 +1308,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+:root {
+  --card-bg: #fff;
+  --hover-bg: #f5f5f7;
+}
+
+.section-header { display: flex; justify-content: space-between; align-items: center; }
 /* Admin 页面样式保持不变，与原版一致 */
 .admin-page { min-height: 100vh; background: transparent; position: relative; z-index: 1; }
 
@@ -1620,5 +1668,51 @@ onMounted(() => {
   width: 100%; height: 100%;
   z-index: 0;
   pointer-events: none;
+}
+
+/* ── 团购树状图 ── */
+.gb-tree-node {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.gb-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-wrap: wrap;
+}
+.gb-tree-header:hover { background: var(--hover-bg); }
+.gb-tree-toggle { font-size: 0.75rem; color: var(--text-light); width: 16px; flex-shrink: 0; }
+.gb-tree-creator { font-weight: 600; color: var(--text-primary); min-width: 100px; }
+.gb-tree-meta { font-size: 0.8rem; color: var(--text-secondary); flex: 1; }
+.gb-tree-time { font-size: 0.75rem; color: var(--text-light); white-space: nowrap; }
+.gb-tree-children { border-top: 1px solid var(--border-color); }
+.gb-tree-leaf {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px 10px 44px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+.gb-tree-leaf:last-child { border-bottom: none; }
+.gb-leaf-name { flex: 1; color: var(--text-primary); }
+.gb-leaf-phone { color: var(--text-secondary); min-width: 100px; font-size: 0.8rem; }
+.gb-leaf-bonus { color: var(--primary-color); font-weight: 600; min-width: 40px; }
+.gb-leaf-time { color: var(--text-light); font-size: 0.75rem; white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .gb-tree-header { gap: 8px; padding: 12px; }
+  .gb-tree-creator { min-width: auto; }
+  .gb-tree-meta { width: 100%; order: 10; }
+  .gb-tree-leaf { padding: 10px 12px; gap: 8px; }
+  .gb-leaf-phone { min-width: auto; }
 }
 </style>
