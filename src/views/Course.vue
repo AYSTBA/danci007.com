@@ -160,7 +160,7 @@ const handleBook = () => {
 
 const goGroupBuy = () => {
   if (!course.value) return;
-  router.push(`/group-buy/${course.value.id}`);
+  router.push(`/group-buy/${course.value.course_id}`);
 };
 
 const sharePage = async () => {
