@@ -46,14 +46,14 @@ const toggleGroupBuy = (id: number) => {
 
 async function loadGroupBuys() {
   try {
-    groupBuys.value = await fetchJson<any[]>('/api/admin/group-buys');
+    groupBuys.value = await fetchJson<any[]>('/api/admin/group-buys', { headers: getAuthHeaders() });
   } catch {}
 }
 
 async function deleteGroupBuy(session: any) {
   if (!confirm(`确认删除 ${session.creator_name} 的团购？\n参与者 ${session.participants?.length || 0} 人`)) return;
   try {
-    await fetchJson(`/api/admin/group-buys/${session.id}`, { method: 'DELETE' });
+    await fetchJson(`/api/admin/group-buys/${session.id}`, { method: 'DELETE', headers: getAuthHeaders() });
     await loadGroupBuys();
   } catch (err: any) {
     alert('删除失败: ' + (err.message || '未知错误'));
