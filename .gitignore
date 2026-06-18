@@ -23,6 +23,7 @@ backend/uploads/
 *.swp
 *.swo
 .workbuddy/
+miniprogram/project.private.config.json
 
 # OS files
 .DS_Store
