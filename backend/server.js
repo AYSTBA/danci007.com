@@ -664,7 +664,8 @@ const initDb = () => {
   // 迁移：删除旧团购表（含 inviter_name/joiners 列），重建新表
   try {
     const cols = db.prepare("PRAGMA table_info(group_buy_sessions)").all();
-    if (cols.some(c => c.name === 'inviter_name')) {
+    const pcols = db.prepare("PRAGMA table_info(group_buy_participants)").all();
+    if (cols.some(c => c.name === 'inviter_name') || !pcols.some(c => c.name === 'user_email')) {
       db.exec('DROP TABLE IF EXISTS group_buy_participants');
       db.exec('DROP TABLE IF EXISTS group_buy_sessions');
     }
@@ -676,6 +677,7 @@ const initDb = () => {
       share_id TEXT NOT NULL UNIQUE,
       creator_name TEXT NOT NULL,
       creator_phone TEXT DEFAULT '',
+      creator_email TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -689,6 +691,7 @@ const initDb = () => {
       session_id INTEGER NOT NULL,
       user_name TEXT NOT NULL,
       user_phone TEXT DEFAULT '',
+      user_email TEXT DEFAULT '',
       lesson_bonus INTEGER DEFAULT 1,
       joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (session_id) REFERENCES group_buy_sessions(id)
@@ -1161,16 +1164,45 @@ function generateShareId() {
 
 // 创建团购
 app.post('/api/group-buy/create', (req, res) => {
-  const { course_id, creator_name, creator_phone } = req.body;
+  const { course_id, creator_name, creator_phone, creator_email } = req.body;
   if (!course_id || !creator_name) {
     return res.status(400).json({ error: '缺少课程ID或用户名称' });
   }
   const shareId = generateShareId();
   db.prepare(`
-    INSERT INTO group_buy_sessions (course_id, share_id, creator_name, creator_phone)
-    VALUES (?, ?, ?, ?)
-  `).run(String(course_id), shareId, creator_name, creator_phone || '');
+    INSERT INTO group_buy_sessions (course_id, share_id, creator_name, creator_phone, creator_email)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(String(course_id), shareId, creator_name, creator_phone || '', creator_email || '');
   res.json({ share_id: shareId });
+});
+
+// 管理员：查看所有团购（放在 :shareId 之前，避免冲突）
+app.get('/api/admin/group-buys', requireAdminAuth, (req, res) => {
+  const sessions = db.prepare('SELECT * FROM group_buy_sessions ORDER BY created_at DESC').all();
+  const result = [];
+  for (const s of sessions) {
+    const participants = db.prepare('SELECT * FROM group_buy_participants WHERE session_id = ? ORDER BY joined_at ASC').all(s.id);
+    const totalBonus = participants.reduce((sum, p) => sum + p.lesson_bonus, 0);
+    result.push({ ...s, participants, total_bonus: totalBonus });
+  }
+  res.json(result);
+});
+
+// 查询某用户参与的所有团购（放在 :shareId 之前，避免冲突）
+app.get('/api/group-buy/user/:userName', (req, res) => {
+  const userName = req.params.userName;
+  const created = db.prepare('SELECT * FROM group_buy_sessions WHERE creator_name = ? ORDER BY created_at DESC').all(userName);
+  const joined = db.prepare(`
+    SELECT s.*, p.joined_at as my_join_time, p.lesson_bonus as my_bonus, p.user_phone, p.user_email
+    FROM group_buy_participants p
+    JOIN group_buy_sessions s ON s.id = p.session_id
+    WHERE p.user_name = ? ORDER BY p.joined_at DESC
+  `).all(userName);
+  for (const s of [...created, ...joined]) {
+    const count = db.prepare('SELECT COUNT(*) as c FROM group_buy_participants WHERE session_id = ?').get(s.id);
+    s.participant_count = count.c;
+  }
+  res.json({ created, joined });
 });
 
 // 查询团购详情（含参与者）
@@ -1185,6 +1217,7 @@ app.get('/api/group-buy/:shareId', (req, res) => {
     share_id: row.share_id,
     creator_name: row.creator_name,
     creator_phone: row.creator_phone,
+    creator_email: row.creator_email,
     participants,
     participant_count: participants.length,
     total_bonus: totalBonus,
@@ -1194,47 +1227,18 @@ app.get('/api/group-buy/:shareId', (req, res) => {
 
 // 加入团购
 app.post('/api/group-buy/:shareId/join', (req, res) => {
-  const { user_name, user_phone } = req.body;
+  const { user_name, user_phone, user_email } = req.body;
   if (!user_name) return res.status(400).json({ error: '请输入你的名称' });
   const row = db.prepare('SELECT * FROM group_buy_sessions WHERE share_id = ?').get(req.params.shareId);
   if (!row) return res.status(404).json({ error: '团购不存在' });
   const existing = db.prepare('SELECT id FROM group_buy_participants WHERE session_id = ? AND user_name = ?').get(row.id, user_name);
   if (existing) return res.status(400).json({ error: '你已经加入过该团购' });
   db.prepare(`
-    INSERT INTO group_buy_participants (session_id, user_name, user_phone) VALUES (?, ?, ?)
-  `).run(row.id, user_name, user_phone || '');
+    INSERT INTO group_buy_participants (session_id, user_name, user_phone, user_email) VALUES (?, ?, ?, ?)
+  `).run(row.id, user_name, user_phone || '', user_email || '');
   const participants = db.prepare('SELECT * FROM group_buy_participants WHERE session_id = ? ORDER BY joined_at ASC').all(row.id);
   const totalBonus = participants.reduce((sum, p) => sum + p.lesson_bonus, 0);
   res.json({ success: true, participant_count: participants.length, total_bonus: totalBonus });
-});
-
-// 查询某用户参与的所有团购
-app.get('/api/group-buy/user/:userName', (req, res) => {
-  const userName = req.params.userName;
-  const created = db.prepare('SELECT * FROM group_buy_sessions WHERE creator_name = ? ORDER BY created_at DESC').all(userName);
-  const joined = db.prepare(`
-    SELECT s.*, p.joined_at as my_join_time, p.lesson_bonus as my_bonus
-    FROM group_buy_participants p
-    JOIN group_buy_sessions s ON s.id = p.session_id
-    WHERE p.user_name = ? ORDER BY p.joined_at DESC
-  `).all(userName);
-  for (const s of [...created, ...joined]) {
-    const count = db.prepare('SELECT COUNT(*) as c FROM group_buy_participants WHERE session_id = ?').get(s.id);
-    s.participant_count = count.c;
-  }
-  res.json({ created, joined });
-});
-
-// 管理员：查看所有团购
-app.get('/api/admin/group-buys', requireAdminAuth, (req, res) => {
-  const sessions = db.prepare('SELECT * FROM group_buy_sessions ORDER BY created_at DESC').all();
-  const result = [];
-  for (const s of sessions) {
-    const participants = db.prepare('SELECT * FROM group_buy_participants WHERE session_id = ? ORDER BY joined_at ASC').all(s.id);
-    const totalBonus = participants.reduce((sum, p) => sum + p.lesson_bonus, 0);
-    result.push({ ...s, participants, total_bonus: totalBonus });
-  }
-  res.json(result);
 });
 
 app.get('/api/courses/:id/interactions', (req, res) => {

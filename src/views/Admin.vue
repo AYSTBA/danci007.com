@@ -1254,22 +1254,25 @@ onMounted(() => {
               <button class="btn-primary" @click="loadGroupBuys" style="padding:8px 20px;font-size:0.85rem">刷新</button>
             </div>
             <div v-if="groupBuys.length === 0" class="empty-state"><p>暂无团购记录</p></div>
-            <div v-for="session in groupBuys" :key="session.id" class="gb-tree-node">
-              <div class="gb-tree-header" @click="toggleGroupBuy(session.id)">
-                <span class="gb-tree-toggle">{{ expandedGroupBuys.has(session.id) ? '▼' : '▶' }}</span>
-                <span class="gb-tree-creator">👤 {{ session.creator_name }}</span>
-                <span class="gb-tree-meta">课程 {{ session.course_id }} · 👥 {{ session.participants?.length || 0 }}人 · 🎁 +{{ session.total_bonus || 0 }}</span>
-                <span class="gb-tree-time">{{ new Date(session.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric' }) }}</span>
-              </div>
-              <div v-if="expandedGroupBuys.has(session.id)" class="gb-tree-children">
-                <div v-for="p in session.participants" :key="p.id" class="gb-tree-leaf">
-                  <span class="gb-leaf-name">👤 {{ p.user_name }}</span>
-                  <span class="gb-leaf-phone">{{ p.user_phone || '—' }}</span>
-                  <span class="gb-leaf-bonus">+{{ p.lesson_bonus }}</span>
-                  <span class="gb-leaf-time">{{ new Date(p.joined_at).toLocaleString('zh-CN') }}</span>
+              <div v-for="session in groupBuys" :key="session.id" class="gb-tree-node">
+                <div class="gb-tree-header" @click="toggleGroupBuy(session.id)">
+                  <span class="gb-tree-toggle">{{ expandedGroupBuys.has(session.id) ? '▼' : '▶' }}</span>
+                  <span class="gb-tree-creator">👤 {{ session.creator_name }}</span>
+                  <span class="gb-tree-contact" v-if="session.creator_phone">📞 {{ session.creator_phone }}</span>
+                  <span class="gb-tree-contact" v-if="session.creator_email">✉️ {{ session.creator_email }}</span>
+                  <span class="gb-tree-meta">课程 {{ session.course_id }} · 👥 {{ session.participants?.length || 0 }}人 · 🎁 +{{ session.total_bonus || 0 }}</span>
+                  <span class="gb-tree-time">{{ new Date(session.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric' }) }}</span>
+                </div>
+                <div v-if="expandedGroupBuys.has(session.id)" class="gb-tree-children">
+                  <div v-for="p in session.participants" :key="p.id" class="gb-tree-leaf">
+                    <span class="gb-leaf-name">👤 {{ p.user_name }}</span>
+                    <span class="gb-leaf-phone">{{ p.user_phone || '—' }}</span>
+                    <span class="gb-leaf-email" v-if="p.user_email">✉️ {{ p.user_email }}</span>
+                    <span class="gb-leaf-bonus">+{{ p.lesson_bonus }}</span>
+                    <span class="gb-leaf-time">{{ new Date(p.joined_at).toLocaleString('zh-CN') }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
 
           <!-- 访客分析已迁移到 /admin/visits 独立子路由 -->

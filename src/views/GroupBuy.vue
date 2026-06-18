@@ -8,6 +8,7 @@ interface Participant {
   id: number
   user_name: string
   user_phone: string
+  user_email: string
   lesson_bonus: number
   joined_at: string
 }
@@ -18,6 +19,7 @@ interface GroupBuySession {
   share_id: string
   creator_name: string
   creator_phone: string
+  creator_email: string
   participant_count: number
   participants?: Participant[]
   total_bonus?: number
@@ -39,12 +41,13 @@ const isZh = computed(() => currentLang.value === 'zh');
 const courseId = computed(() => (route.params.courseId as string) || '');
 const shareIdFromUrl = computed(() => (route.params.shareId as string) || '');
 
-// ── localStorage 持久化名称 ──
 const savedName = localStorage.getItem('groupbuy_user') || '';
 const savedPhone = localStorage.getItem('groupbuy_phone') || '';
+const savedEmail = localStorage.getItem('groupbuy_email') || '';
 
 const localName = ref(savedName);
 const localPhone = ref(savedPhone);
+const localEmail = ref(savedEmail);
 const nameConfirmed = ref(!!savedName);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -59,9 +62,9 @@ const pageUrl = computed(() => window.location.origin);
 function saveUser() {
   localStorage.setItem('groupbuy_user', localName.value.trim());
   localStorage.setItem('groupbuy_phone', localPhone.value.trim());
+  localStorage.setItem('groupbuy_email', localEmail.value.trim());
 }
 
-// ── 课程名称 ──
 const courseName = ref('');
 onMounted(async () => {
   if (courseId.value) {
@@ -93,7 +96,9 @@ async function loadSession() {
 
 async function confirmName() {
   const name = localName.value.trim();
+  const phone = localPhone.value.trim();
   if (!name) { error.value = '请输入你的名称'; return; }
+  if (!phone) { error.value = '请输入手机号'; return; }
   saveUser();
   nameConfirmed.value = true;
   error.value = null;
@@ -111,11 +116,11 @@ async function createGroupBuy() {
       body: JSON.stringify({
         course_id: courseId.value,
         creator_name: localName.value.trim(),
-        creator_phone: localPhone.value.trim()
+        creator_phone: localPhone.value.trim(),
+        creator_email: localEmail.value.trim()
       })
     });
     await loadUserSessions();
-    // 跳转到这个团购详情
     router.push(`/group-buy/${courseId.value}/${data.share_id}`);
   } catch (err: any) {
     error.value = err.message || '创建失败';
@@ -131,7 +136,8 @@ async function joinGroupBuy() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         user_name: localName.value.trim(),
-        user_phone: localPhone.value.trim()
+        user_phone: localPhone.value.trim(),
+        user_email: localEmail.value.trim()
       })
     });
     joinSuccess.value = true;
@@ -157,8 +163,10 @@ function goBack() {
 function logout() {
   localStorage.removeItem('groupbuy_user');
   localStorage.removeItem('groupbuy_phone');
+  localStorage.removeItem('groupbuy_email');
   localName.value = '';
   localPhone.value = '';
+  localEmail.value = '';
   nameConfirmed.value = false;
   userSessions.value = null;
   currentSession.value = null;
@@ -181,53 +189,55 @@ function isOwnSession(session: GroupBuySession) {
         <h1 class="gb-title">{{ isZh ? '🎯 团购拼课' : '🎯 Group Buying' }}</h1>
         <p v-if="courseName" class="gb-course-name">{{ courseName }}</p>
 
-        <!-- ── 登录 / 注册（名称即账户）── -->
         <div v-if="!nameConfirmed" class="gb-section">
-          <label class="gb-label">{{ isZh ? '输入你的名称（名称即账户）' : 'Your name is your account' }}</label>
-          <div class="gb-input-row">
-            <input v-model="localName" class="gb-input" :placeholder="isZh ? '你的名称' : 'Your name'" @keyup.enter="confirmName" />
-          </div>
-          <label class="gb-label">{{ isZh ? '手机号（选填，用于预约联系）' : 'Phone (optional)' }}</label>
-          <div class="gb-input-row">
-            <input v-model="localPhone" class="gb-input" :placeholder="isZh ? '手机号' : 'Phone'" @keyup.enter="confirmName" />
-          </div>
-          <button class="gb-btn gb-btn-primary gb-btn-block" @click="confirmName">{{ isZh ? '进入' : 'Enter' }}</button>
+          <label class="gb-label">{{ isZh ? '姓名' : 'Name' }} <span class="gb-req">*</span></label>
+          <input v-model="localName" class="gb-input" :placeholder="isZh ? '请输入姓名' : 'Your name'" @keyup.enter="confirmName" />
+          <label class="gb-label" style="margin-top:12px">{{ isZh ? '联系电话' : 'Phone' }} <span class="gb-req">*</span></label>
+          <input v-model="localPhone" class="gb-input" type="tel" :placeholder="isZh ? '请输入手机号码' : 'Phone'" @keyup.enter="confirmName" />
+          <label class="gb-label" style="margin-top:12px">{{ isZh ? '邮箱（选填）' : 'Email (optional)' }}</label>
+          <input v-model="localEmail" class="gb-input" type="email" :placeholder="isZh ? '请输入邮箱地址' : 'Email'" @keyup.enter="confirmName" />
+          <button class="gb-btn gb-btn-primary gb-btn-block" @click="confirmName" style="margin-top:20px">{{ isZh ? '进入' : 'Enter' }}</button>
           <p v-if="error" class="gb-error">{{ error }}</p>
         </div>
 
-        <!-- ── 已登录 ── -->
         <div v-else class="gb-section">
           <div class="gb-user-bar">
             <span class="gb-user-name">👤 {{ localName }}</span>
+            <span class="gb-user-phone">📞 {{ localPhone }}</span>
             <button class="gb-btn gb-btn-text" @click="logout">{{ isZh ? '切换' : 'Switch' }}</button>
           </div>
 
-          <!-- 当前团购详情（有 shareId 时） -->
           <template v-if="shareIdFromUrl">
             <div v-if="loading" class="gb-loading">{{ isZh ? '加载中...' : 'Loading...' }}</div>
             <div v-else-if="!currentSession" class="gb-error-text">{{ error || (isZh ? '团购不存在' : 'Not found') }}</div>
             <template v-else>
               <div class="gb-session-detail">
-                <p class="gb-detail-creator">{{ isZh ? '发起人' : 'Host' }}: 👤 {{ currentSession.creator_name }}</p>
+                <div class="gb-detail-creator">
+                  <span>{{ isZh ? '发起人' : 'Host' }}: 👤 {{ currentSession.creator_name }}</span>
+                  <span class="gb-detail-contact" v-if="currentSession.creator_phone">📞 {{ currentSession.creator_phone }}</span>
+                  <span class="gb-detail-contact" v-if="currentSession.creator_email">✉️ {{ currentSession.creator_email }}</span>
+                </div>
                 <p class="gb-detail-count">{{ isZh ? '已参与' : 'Joined' }}: 👥 {{ currentSession.participant_count }} {{ isZh ? '人' : '' }}</p>
                 <p class="gb-detail-bonus">{{ isZh ? '累计课时奖励' : 'Bonus' }}: 🎁 +{{ currentSession.total_bonus }}</p>
                 <div class="gb-share-box" v-if="isOwnSession(currentSession)">
                   <code class="gb-link-text">{{ pageUrl }}/group-buy/{{ courseId }}/{{ currentSession.share_id }}</code>
                   <button class="gb-btn gb-btn-primary gb-btn-sm" @click="copyLink(currentSession)">
-                    {{ copyTip ? (isZh ? '✓' : '✓') : (isZh ? '复制' : 'Copy') }}
+                    {{ copyTip ? '✓' : (isZh ? '复制' : 'Copy') }}
                   </button>
                 </div>
-                <!-- 加入按钮 -->
                 <button v-if="!joinSuccess && !isOwnSession(currentSession)" class="gb-btn gb-btn-primary gb-btn-block" @click="joinGroupBuy" :disabled="loading">
                   {{ loading ? (isZh ? '加入中...' : 'Joining...') : (isZh ? '加入团购' : 'Join') }}
                 </button>
                 <div v-else-if="joinSuccess" class="gb-success">✅ {{ isZh ? '你已加入该团购' : 'Joined!' }}</div>
 
-                <!-- 参与者列表 -->
                 <div v-if="currentSession.participants?.length" class="gb-participant-list">
                   <h3>{{ isZh ? '参与者' : 'Participants' }} ({{ currentSession.participants.length }})</h3>
                   <div v-for="p in currentSession.participants" :key="p.id" class="gb-participant-item">
-                    <span>👤 {{ p.user_name }}</span>
+                    <div class="gb-pinfo">
+                      <span class="gb-pname">👤 {{ p.user_name }}</span>
+                      <span class="gb-pcontact" v-if="p.user_phone">📞 {{ p.user_phone }}</span>
+                      <span class="gb-pcontact" v-if="p.user_email">✉️ {{ p.user_email }}</span>
+                    </div>
                     <span class="gb-ptime">{{ p.joined_at.slice(0, 16).replace('T', ' ') }}</span>
                   </div>
                 </div>
@@ -235,13 +245,11 @@ function isOwnSession(session: GroupBuySession) {
             </template>
           </template>
 
-          <!-- 无 shareId → 用户面板 -->
           <template v-else>
             <button class="gb-btn gb-btn-primary gb-btn-block" @click="createGroupBuy" :disabled="loading" style="margin-bottom:20px">
               {{ loading ? (isZh ? '创建中...' : 'Creating...') : (isZh ? '创建团购' : 'Create Group Buy') }}
             </button>
 
-            <!-- 我创建的 -->
             <div v-if="userSessions?.created?.length" class="gb-list-section">
               <h3 class="gb-list-title">{{ isZh ? '我创建的团购' : 'My Created' }} ({{ userSessions.created.length }})</h3>
               <div v-for="s in userSessions.created" :key="s.id" class="gb-session-row" @click="viewSession(s)">
@@ -250,7 +258,6 @@ function isOwnSession(session: GroupBuySession) {
               </div>
             </div>
 
-            <!-- 我加入的 -->
             <div v-if="userSessions?.joined?.length" class="gb-list-section">
               <h3 class="gb-list-title">{{ isZh ? '我加入的团购' : 'My Joined' }} ({{ userSessions.joined.length }})</h3>
               <div v-for="s in userSessions.joined" :key="s.id" class="gb-session-row" @click="viewSession(s)">
@@ -283,8 +290,8 @@ function isOwnSession(session: GroupBuySession) {
 .gb-course-name { text-align: center; color: #6e6e73; font-size: 0.95rem; margin: 0 0 24px; }
 .gb-section { margin-top: 16px; }
 .gb-label { display: block; font-size: 0.85rem; color: #6e6e73; margin-bottom: 8px; }
-.gb-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
-.gb-input { flex: 1; padding: 12px 16px; border: 1px solid #d2d2d7; border-radius: 12px; font-size: 1rem; background: rgba(255,255,255,0.8); outline: none; font-family: inherit; color: #1d1d1f; transition: border-color 0.2s; }
+.gb-req { color: #ff3b30; }
+.gb-input { width: 100%; padding: 12px 16px; border: 1px solid #d2d2d7; border-radius: 12px; font-size: 1rem; background: rgba(255,255,255,0.8); outline: none; font-family: inherit; color: #1d1d1f; transition: border-color 0.2s; box-sizing: border-box; }
 .gb-input:focus { border-color: #0071e3; }
 .gb-btn { padding: 12px 24px; border: none; border-radius: 980px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit; white-space: nowrap; }
 .gb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -297,19 +304,24 @@ function isOwnSession(session: GroupBuySession) {
 .gb-error-text { color: #ff3b30; font-size: 0.95rem; text-align: center; padding: 20px 0; }
 .gb-loading { text-align: center; color: #6e6e73; padding: 40px 0; }
 
-.gb-user-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,113,227,0.1); border-radius: 12px; margin-bottom: 20px; }
-.gb-user-name { font-size: 1.1rem; font-weight: 600; color: #1d1d1f; }
+.gb-user-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,113,227,0.1); border-radius: 12px; margin-bottom: 20px; gap: 8px; flex-wrap: wrap; }
+.gb-user-name { font-size: 1rem; font-weight: 600; color: #1d1d1f; }
+.gb-user-phone { font-size: 0.85rem; color: #6e6e73; }
 .gb-success { text-align: center; color: #34c759; font-size: 1rem; font-weight: 500; padding: 12px; background: rgba(52,199,89,0.1); border-radius: 12px; margin: 12px 0; }
 
-.gb-session-detail { }
-.gb-detail-creator, .gb-detail-count, .gb-detail-bonus { font-size: 0.95rem; color: #1d1d1f; margin: 6px 0; }
+.gb-detail-creator { font-size: 0.95rem; color: #1d1d1f; margin: 6px 0; display: flex; gap: 12px; flex-wrap: wrap; }
+.gb-detail-contact { font-size: 0.85rem; color: #6e6e73; }
+.gb-detail-count, .gb-detail-bonus { font-size: 0.95rem; color: #1d1d1f; margin: 6px 0; }
 .gb-share-box { display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.05); padding: 12px 16px; border-radius: 12px; margin: 12px 0; }
 .gb-link-text { flex: 1; font-size: 0.75rem; word-break: break-all; color: #1d1d1f; line-height: 1.4; }
 
 .gb-participant-list { margin-top: 16px; }
 .gb-participant-list h3 { font-size: 1rem; font-weight: 600; color: #1d1d1f; margin: 0 0 12px; }
-.gb-participant-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.5); margin-bottom: 6px; }
-.gb-ptime { font-size: 0.75rem; color: #86868b; }
+.gb-participant-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.5); margin-bottom: 6px; gap: 8px; }
+.gb-pinfo { display: flex; flex-direction: column; gap: 2px; }
+.gb-pname { font-size: 0.9rem; font-weight: 500; color: #1d1d1f; }
+.gb-pcontact { font-size: 0.75rem; color: #6e6e73; }
+.gb-ptime { font-size: 0.75rem; color: #86868b; white-space: nowrap; }
 
 .gb-list-section { margin-bottom: 20px; }
 .gb-list-title { font-size: 1rem; font-weight: 600; color: #1d1d1f; margin: 0 0 8px; }
