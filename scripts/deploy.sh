@@ -18,7 +18,7 @@ case "${1:-}" in
     # 检查部署目录
     if [ ! -d "$DEPLOY_DIR" ]; then
       log_info "目录不存在，克隆代码..."
-      git clone https://github.com/AYSTBA/danci007web.git "$DEPLOY_DIR"
+      git clone https://github.com/AYSTBA/zxsz007.com_server.git "$DEPLOY_DIR"
     fi
 
     cd "$DEPLOY_DIR"

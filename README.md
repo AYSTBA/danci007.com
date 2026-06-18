@@ -144,21 +144,34 @@ npm run dev
 
 详见 [docs/DEPLOY.md](./docs/DEPLOY.md)
 
-### 快速开始
+### 仓库结构
+
+本项目使用双仓库策略：
+
+| 仓库 | 用途 | 可见性 |
+|------|------|--------|
+| `AYSTBA/danci007.com` | 公开源码 | Public |
+| `AYSTBA/zxsz007.com_server` | 服务器部署专用 | Private |
+
+### 推送代码
 
 ```bash
-# 克隆代码
-git clone https://github.com/AYSTBA/danci007web.git
-cd danci007web
+# 推送到两个仓库（推荐）
+git push-all
 
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env，设置 ADMIN_PASSWORD 和 CORS_ORIGIN
+# 或手动分别推送
+git push origin main   # 公开仓库
+git push server main   # 私有仓库
+```
 
-# 启动（需要 PM2）
-pm2 start ecosystem.config.cjs --env production
-pm2 save
-pm2 startup
+### 服务器部署
+
+```bash
+# 服务器拉取私有仓库
+ssh root@your-server-ip
+cd /root/danci007web
+git pull origin main
+pm2 restart danci007web --update-env
 ```
 
 > **注意：** `dist/` 已包含在 git 中，服务器无需执行 `npm run build`。
