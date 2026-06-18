@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useLanguage } from '../composables/useLanguage';
 import { fetchJson } from '../utils';
@@ -59,6 +59,8 @@ const userSessions = ref<UserData | null>(null);
 
 const pageUrl = computed(() => window.location.origin);
 
+const loadingSession = ref(false);
+
 function saveUser() {
   localStorage.setItem('groupbuy_user', localName.value.trim());
   localStorage.setItem('groupbuy_phone', localPhone.value.trim());
@@ -79,6 +81,13 @@ onMounted(async () => {
   }
 });
 
+// 路由参数变化时重新加载团购（导航来自 createGroupBuy）
+watch(shareIdFromUrl, (newVal) => {
+  if (newVal && nameConfirmed.value) {
+    loadSession();
+  }
+});
+
 async function loadUserSessions() {
   try {
     userSessions.value = await fetchJson<UserData>(`/api/group-buy/user/${encodeURIComponent(localName.value.trim())}`);
@@ -87,10 +96,14 @@ async function loadUserSessions() {
 
 async function loadSession() {
   if (!shareIdFromUrl.value) return;
+  loadingSession.value = true;
   try {
     currentSession.value = await fetchJson<GroupBuySession>(`/api/group-buy/${shareIdFromUrl.value}`);
+    error.value = null;
   } catch {
     error.value = '团购不存在或已失效';
+  } finally {
+    loadingSession.value = false;
   }
 }
 
@@ -208,7 +221,7 @@ function isOwnSession(session: GroupBuySession) {
           </div>
 
           <template v-if="shareIdFromUrl">
-            <div v-if="loading" class="gb-loading">{{ isZh ? '加载中...' : 'Loading...' }}</div>
+            <div v-if="loadingSession" class="gb-loading">{{ isZh ? '加载中...' : 'Loading...' }}</div>
             <div v-else-if="!currentSession" class="gb-error-text">{{ error || (isZh ? '团购不存在' : 'Not found') }}</div>
             <template v-else>
               <div class="gb-session-detail">
