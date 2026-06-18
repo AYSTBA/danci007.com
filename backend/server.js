@@ -661,6 +661,14 @@ const initDb = () => {
     CREATE INDEX IF NOT EXISTS idx_visit_time ON page_visits(visit_time DESC);
     CREATE INDEX IF NOT EXISTS idx_visit_ip ON page_visits(ip);
   `);
+  // 迁移：删除旧团购表（含 inviter_name/joiners 列），重建新表
+  try {
+    const cols = db.prepare("PRAGMA table_info(group_buy_sessions)").all();
+    if (cols.some((c: any) => c.name === 'inviter_name')) {
+      db.exec('DROP TABLE IF EXISTS group_buy_sessions');
+      db.exec('DROP TABLE IF EXISTS group_buy_participants');
+    }
+  } catch { /* 新安装，表不存在 */ }
   db.exec(`
     CREATE TABLE IF NOT EXISTS group_buy_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
