@@ -41,6 +41,9 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '5mb' }));
 
+// Express 信任 Nginx 反向代理
+app.set('trust proxy', 1);
+
 // ── 登录频率限制 ──
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
