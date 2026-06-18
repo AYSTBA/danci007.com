@@ -1,6 +1,6 @@
 # 单词突击007 - API 文档
 
-**Base URL (生产):** `https://zxsz007.cn`  
+**Base URL (生产):** `https://your-domain.com`   
 **Base URL (开发):** `http://localhost:3001`  
 **Content-Type:** `application/json` (除了文件上传)
 
@@ -992,7 +992,7 @@ Content-Type: application/json
 ```python
 import requests
 
-BASE_URL = "https://zxsz007.cn"
+BASE_URL = "https://your-domain.com"
 
 # 1. 登录获取 token
 def login(password="your_password"):
@@ -1053,7 +1053,7 @@ if __name__ == "__main__":
 ```javascript
 const axios = require('axios');
 
-const BASE_URL = 'https://zxsz007.cn';
+const BASE_URL = 'https://your-domain.com';
 
 // 1. 登录获取 token
 async function login(password = 'your_password') {

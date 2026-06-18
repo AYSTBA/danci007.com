@@ -1,6 +1,6 @@
 # 单词突击007 — API 文档
 
-> Base URL: `https://zxsz007.cn` (生产) / `http://localhost:3001` (本地)
+> Base URL: `https://your-domain.com` (生产) / `http://localhost:3001` (本地)
 >
 > 所有响应均为 JSON。错误返回 `{ "error": "..." }`，HTTP 状态码遵循 REST 约定。
 
@@ -725,22 +725,22 @@ node backend/server.js --cleanup 24
 
 ```bash
 # 1. 登录
-TOKEN=$(curl -s -X POST https://zxsz007.cn/api/admin/login \
+TOKEN=$(curl -s -X POST https://your-domain.com/api/admin/login \
   -H 'Content-Type: application/json' \
   -d '{"password":"YOUR_PASSWORD"}' | grep -oE '"token":"[^"]+' | cut -d'"' -f4)
 
 # 2. 用 token 调管理 API
-curl -s https://zxsz007.cn/api/admin/courses \
+curl -s https://your-domain.com/api/admin/courses \
   -H "X-Admin-Token: $TOKEN"
 
 # 3. 上传图片
-curl -s -X POST https://zxsz007.cn/api/upload \
+curl -s -X POST https://your-domain.com/api/upload \
   -H "X-Admin-Token: $TOKEN" \
   -F "file=@/path/to/photo.jpg"
 # → {"url":"/uploads/1780668465159-555258858.webp"}
 
 # 4. 创建课程
-curl -s -X POST https://zxsz007.cn/api/courses \
+curl -s -X POST https://your-domain.com/api/courses \
   -H "X-Admin-Token: $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -752,7 +752,7 @@ curl -s -X POST https://zxsz007.cn/api/courses \
   }'
 
 # 5. 扫描孤儿文件
-curl -s https://zxsz007.cn/api/admin/orphan-uploads \
+curl -s https://your-domain.com/api/admin/orphan-uploads \
   -H "X-Admin-Token: $TOKEN"
 ```
 

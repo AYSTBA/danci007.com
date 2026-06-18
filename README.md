@@ -1,17 +1,17 @@
-# 📘 单词突击007 - 龙岗教学点分站
+# 📘 单词突击007 - 教学点分站
 
 <div align="center">
 
-**智能单词学习系统 - 深圳市龙岗区教学点**
+**智能单词学习系统 - 教学点分站模板**
 
 [![Vue 3](https://img.shields.io/badge/Vue-3.4-brightgreen?style=flat&logo=vue.js)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green?style=flat&logo=node.js)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.18-000000?style=flat&logo=express)](https://expressjs.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3.45-003B57?style=flat&logo=sqlite)](https://www.sqlite.org/)
 
-[🚀 在线演示](https://zxsz007.cn) | [📚 API 文档](./docs/API.md) | [📝 更新日志](./docs/CHANGELOG.md)
+[📚 API 文档](./docs/API.md) | [📝 更新日志](./docs/CHANGELOG.md) | [🚀 部署指南](./docs/DEPLOY.md)
 
 </div>
 
@@ -21,11 +21,11 @@
 
 **单词突击007** 是一款智能单词学习系统，基于艾宾浩斯遗忘曲线理论，帮助用户高效记忆英语单词。
 
-本项目是 **深圳市龙岗区教学点** 的分站，包含：
+本项目是教学点分站模板，包含：
 - 🏠 **官方网站** - 展示课程、教师、预约报名
+- 🎯 **团购拼课** - 名称即账户，分享链接拼团
 - 🔐 **管理后台** - 管理内容、预约、课程、访客分析
-- 🖥 **服务器运行面板** - 实时监控 CPU、内存、磁盘、GPU
-- 📱 **微信小程序**（开发中）
+- 🖥 **服务器运行面板** - 实时监控 CPU、内存、磁盘
 
 ---
 
@@ -35,6 +35,7 @@
 - 📖 **课程展示** - 浏览所有课程，查看详情
 - 👨🏫 **教师团队** - 了解资深教师
 - 📅 **在线预约** - 预约试听课程
+- 🎯 **团购拼课** - 创建/加入团购，分享链接
 - 🌐 **双语支持** - 中文 / English 一键切换
 - 📱 **响应式设计** - 完美适配手机、平板、PC
 
@@ -45,8 +46,9 @@
 - 👨🏫 **教师管理** - 添加/编辑/删除教师
 - 📅 **预约管理** - 查看/删除用户预约
 - 🎓 **课程管理** - 课程 CRUD
-- 📊 **访客分析** - 独立访客统计、浏览器/OS 分布、IP 地理
-- 🖥 **服务器监控** - CPU/内存/磁盘/GPU 实时使用率
+- 🎯 **团购管理** - 树状图查看，支持删除
+- 📊 **访客分析** - 独立访客统计、浏览器/OS 分布
+- 🖥 **服务器监控** - CPU/内存/磁盘实时使用率
 - 📤 **文件上传** - 拖拽上传，自动压缩为 WebP
 
 ---
@@ -88,7 +90,7 @@ danci007web/
 │   └── server.js          # 主服务器文件
 │
 ├── src/                   # 前端源代码
-│   ├── components/        # 可复用组件（ImageEditor）
+│   ├── components/        # 可复用组件
 │   ├── composables/       # Vue 组合式函数
 │   ├── router/            # 路由配置
 │   ├── types/             # TypeScript 类型定义
@@ -100,7 +102,9 @@ danci007web/
 │
 ├── dist/                  # Vite 构建输出（git 跟踪）
 ├── docs/                  # 项目文档
+├── .env.example           # 环境变量模板
 ├── .gitignore
+├── ecosystem.config.cjs   # PM2 配置
 ├── index.html
 ├── package.json
 ├── vite.config.ts
@@ -125,6 +129,7 @@ cd backend && npm install && cd ..
 
 # 2. 配置环境变量
 cp .env.example .env
+# 编辑 .env，设置 ADMIN_PASSWORD
 
 # 3. 启动后端（端口 3001）
 cd backend && node server.js
@@ -137,29 +142,26 @@ npm run dev
 
 ## 🚢 部署
 
-### 生产服务器
-- **域名：** https://zxsz007.cn
-- **IP：** 165.99.43.241
-- **后端端口：** 3001（Nginx 反向代理）
-- **进程管理：** PM2
+详见 [docs/DEPLOY.md](./docs/DEPLOY.md)
 
-### 更新代码
+### 快速开始
 
 ```bash
-# 本地修改 → 推送
-git add .
-git commit -m "描述"
-git push origin main
+# 克隆代码
+git clone https://github.com/AYSTBA/danci007web.git
+cd danci007web
 
-# 服务器自动更新（或手动 SSH 执行）
-ssh root@165.99.43.241
-cd /root/danci007web
-git fetch origin +refs/heads/main:refs/remotes/origin/main
-git reset --hard origin/main
-pm2 restart danci007web --update-env
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，设置 ADMIN_PASSWORD 和 CORS_ORIGIN
+
+# 启动（需要 PM2）
+pm2 start ecosystem.config.cjs --env production
+pm2 save
+pm2 startup
 ```
 
-> **注意：** 服务器不执行 `npm run build`，`dist/` 已包含在 git 中。
+> **注意：** `dist/` 已包含在 git 中，服务器无需执行 `npm run build`。
 
 ---
 
@@ -175,16 +177,14 @@ pm2 restart danci007web --update-env
 
 ---
 
-## 📄 开源协议
+## 🔐 安全说明
 
-MIT License
-
-Copyright © 2026 中萱文化 - 深圳市龙岗区教学点
+- 管理员密码通过 `.env` 文件配置，**不要提交到 git**
+- 生产环境请设置 `CORS_ORIGIN` 为你的域名（不要留 `*`）
+- 建议配置 HTTPS
 
 ---
 
-## 📞 联系方式
+## 📄 开源协议
 
-- 🌐 **网站：** https://zxsz007.cn
-- 📍 **地址：** 深圳市龙岗区悦龙华府·二期8栋20号（中萱英语）
-- 📞 **电话：** 18938908657
+MIT License

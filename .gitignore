@@ -47,7 +47,6 @@ pm2.log*
 *.tmp
 *.bak
 *.backup
-.workbuddy/
 
 # TypeScript 编译输出
 dist-ssr/
@@ -57,19 +56,15 @@ dist-ssr/
 # Vite 缓存
 .vite/
 
-# 本地开发启动脚本（可选，建议保留）
-# start-server-80.bat
-# start-server-80.ps1
-
 # 测试覆盖率
 coverage/
 .nyc_output/
 
-# 微信小程序（独立项目，可选）
-# miniprogram/
-
-# 文档生成（如果有）
-docs/api/
+# 本地开发脚本（Windows）
+start-server-*.bat
+start-server-*.ps1
+deploy-server.sh
+server-deploy.sh
 
 # Playwright CLI 缓存
 .playwright-cli/
@@ -80,5 +75,4 @@ debug.png
 homepage.png
 snapshot.yml
 homepage.yml
-deploy-server.sh
 
