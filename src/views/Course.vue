@@ -158,6 +158,11 @@ const handleBook = () => {
   router.push(`/booking?course=${encodeURIComponent(course.value.course_id)}`);
 };
 
+const goGroupBuy = () => {
+  if (!course.value) return;
+  router.push(`/group-buy/${course.value.id}`);
+};
+
 const sharePage = async () => {
   const c = course.value;
   if (!c) return;
@@ -519,6 +524,10 @@ onMounted(() => {
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <span>{{ t('首页', 'Home') }}</span>
             </router-link>
+            <div class="action-item" @click="goGroupBuy">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              <span>{{ t('团购', 'Group') }}</span>
+            </div>
             <div class="action-item" @click="sharePage">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
               <span>{{ t('分享', 'Share') }}</span>

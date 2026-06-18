@@ -661,6 +661,20 @@ const initDb = () => {
     CREATE INDEX IF NOT EXISTS idx_visit_time ON page_visits(visit_time DESC);
     CREATE INDEX IF NOT EXISTS idx_visit_ip ON page_visits(ip);
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS group_buy_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      course_id TEXT NOT NULL,
+      share_id TEXT NOT NULL UNIQUE,
+      inviter_name TEXT NOT NULL,
+      inviter_session_bonus INTEGER DEFAULT 0,
+      joiners TEXT DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_group_buy_share ON group_buy_sessions(share_id);
+    CREATE INDEX IF NOT EXISTS idx_group_buy_course ON group_buy_sessions(course_id);
+  `);
   // 兼容老表: 添加新列
   try { db.exec(`ALTER TABLE page_visits ADD COLUMN suspicious TEXT DEFAULT ''`); } catch { /* 已存在 */ }
 
@@ -1118,7 +1132,84 @@ app.get('/api/admin/course-reviews', requireAdminAuth, (req, res) => {
   res.json(rows);
 });
 
-// ── 课程互动 API ──
+// ── 团购 API ──
+
+// 生成唯一分享 ID (32 位 hex)
+function generateShareId() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// 创建团购
+app.post('/api/group-buy/create', (req, res) => {
+  const { course_id, inviter_name } = req.body;
+  if (!course_id || !inviter_name) {
+    return res.status(400).json({ error: '缺少课程ID或发起人名称' });
+  }
+  const shareId = generateShareId();
+  db.prepare(`
+    INSERT INTO group_buy_sessions (course_id, share_id, inviter_name, joiners)
+    VALUES (?, ?, ?, '[]')
+  `).run(String(course_id), shareId, inviter_name);
+  res.json({ share_id: shareId });
+});
+
+// 查询团购信息
+app.get('/api/group-buy/:shareId', (req, res) => {
+  const row = db.prepare('SELECT * FROM group_buy_sessions WHERE share_id = ?').get(req.params.shareId);
+  if (!row) {
+    return res.status(404).json({ error: '团购不存在' });
+  }
+  const joiners = JSON.parse(row.joiners || '[]');
+  res.json({
+    id: row.id,
+    course_id: row.course_id,
+    share_id: row.share_id,
+    inviter_name: row.inviter_name,
+    inviter_session_bonus: row.inviter_session_bonus,
+    joiners,
+    joiner_count: joiners.length,
+    created_at: row.created_at
+  });
+});
+
+// 加入团购
+app.post('/api/group-buy/:shareId/join', (req, res) => {
+  const { joiner_name } = req.body;
+  if (!joiner_name) {
+    return res.status(400).json({ error: '请输入你的名称' });
+  }
+  const row = db.prepare('SELECT * FROM group_buy_sessions WHERE share_id = ?').get(req.params.shareId);
+  if (!row) {
+    return res.status(404).json({ error: '团购不存在' });
+  }
+  const joiners = JSON.parse(row.joiners || '[]');
+  // 检查是否已加入
+  if (joiners.some(j => j.name === joiner_name)) {
+    return res.status(400).json({ error: '你已经加入过该团购' });
+  }
+  joiners.push({
+    name: joiner_name,
+    joined_at: new Date().toISOString()
+  });
+  const inviterBonus = row.inviter_session_bonus + 1;
+  db.prepare(`
+    UPDATE group_buy_sessions
+    SET joiners = ?, inviter_session_bonus = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE share_id = ?
+  `).run(JSON.stringify(joiners), inviterBonus, req.params.shareId);
+  res.json({
+    success: true,
+    joiner_name,
+    inviter_session_bonus: inviterBonus,
+    joiner_count: joiners.length
+  });
+});
+
+// 检查 shareId 是否存在
+app.get('/api/group-buy/check/:shareId', (req, res) => {
+  const row = db.prepare('SELECT share_id FROM group_buy_sessions WHERE share_id = ?').get(req.params.shareId);
+  res.json({ exists: !!row });
+});
 
 app.get('/api/courses/:id/interactions', (req, res) => {
   const rows = db.prepare('SELECT * FROM course_interactions WHERE course_id = ? ORDER BY created_at DESC').all(req.params.id);

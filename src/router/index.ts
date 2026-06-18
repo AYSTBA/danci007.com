@@ -42,6 +42,11 @@ const routes: RouteRecordRaw[] = [
     name: 'CourseDetail',
     component: () => import('../views/Course.vue')
   },
+  {
+    path: '/group-buy/:courseId/:shareId?',
+    name: 'GroupBuy',
+    component: () => import('../views/GroupBuy.vue')
+  },
   // 兼容旧链接
   {
     path: '/enrollment',
