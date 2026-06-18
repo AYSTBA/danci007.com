@@ -60,6 +60,16 @@ async function deleteGroupBuy(session: any) {
   }
 }
 
+async function deleteParticipant(sessionId: number, participant: any) {
+  if (!confirm(`确认移除参与者「${participant.user_name}」？`)) return;
+  try {
+    await fetchJson(`/api/admin/group-buys/${sessionId}/participants/${participant.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    await loadGroupBuys();
+  } catch (err: any) {
+    alert('删除失败: ' + (err.message || '未知错误'));
+  }
+}
+
 // 课程管理
 const courses = ref<any[]>([]);
 const editingCourse = ref<any | null>(null);
@@ -1277,10 +1287,11 @@ onMounted(() => {
                 <div v-if="expandedGroupBuys.has(session.id)" class="gb-tree-children">
                   <div v-for="p in session.participants" :key="p.id" class="gb-tree-leaf">
                     <span class="gb-leaf-name">👤 {{ p.user_name }}</span>
-                    <span class="gb-leaf-phone">{{ p.user_phone || '—' }}</span>
-                    <span class="gb-leaf-email" v-if="p.user_email">✉️ {{ p.user_email }}</span>
+                    <span class="gb-leaf-contact">📞 {{ p.user_phone || '—' }}</span>
+                    <span class="gb-leaf-contact">✉️ {{ p.user_email || '—' }}</span>
                     <span class="gb-leaf-bonus">+{{ p.lesson_bonus }}</span>
                     <span class="gb-leaf-time">{{ new Date(p.joined_at).toLocaleString('zh-CN') }}</span>
+                    <button class="gb-tree-delete" @click.stop="deleteParticipant(session.id, p)" title="移除">✕</button>
                   </div>
                 </div>
               </div>
@@ -1712,16 +1723,16 @@ onMounted(() => {
 .gb-tree-leaf {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 10px 16px 10px 44px;
   font-size: 0.85rem;
   border-bottom: 1px solid var(--border-light);
   flex-wrap: wrap;
 }
 .gb-tree-leaf:last-child { border-bottom: none; }
-.gb-leaf-name { flex: 1; color: var(--text-primary); }
-.gb-leaf-phone { color: var(--text-secondary); min-width: 100px; font-size: 0.8rem; }
-.gb-leaf-bonus { color: var(--primary-color); font-weight: 600; min-width: 40px; }
+.gb-leaf-name { flex: 1; color: var(--text-primary); min-width: 120px; }
+.gb-leaf-contact { color: var(--text-secondary); min-width: 160px; font-size: 0.8rem; }
+.gb-leaf-bonus { color: var(--primary-color); font-weight: 600; min-width: 40px; text-align: center; }
 .gb-leaf-time { color: var(--text-light); font-size: 0.75rem; white-space: nowrap; }
 
 @media (max-width: 768px) {
@@ -1729,6 +1740,6 @@ onMounted(() => {
   .gb-tree-creator { min-width: auto; }
   .gb-tree-meta { width: 100%; order: 10; }
   .gb-tree-leaf { padding: 10px 12px; gap: 8px; }
-  .gb-leaf-phone { min-width: auto; }
+  .gb-leaf-contact { min-width: 120px; }
 }
 </style>
