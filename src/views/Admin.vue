@@ -50,6 +50,16 @@ async function loadGroupBuys() {
   } catch {}
 }
 
+async function deleteGroupBuy(session: any) {
+  if (!confirm(`确认删除 ${session.creator_name} 的团购？\n参与者 ${session.participants?.length || 0} 人`)) return;
+  try {
+    await fetchJson(`/api/admin/group-buys/${session.id}`, { method: 'DELETE' });
+    await loadGroupBuys();
+  } catch (err: any) {
+    alert('删除失败: ' + (err.message || '未知错误'));
+  }
+}
+
 // 课程管理
 const courses = ref<any[]>([]);
 const editingCourse = ref<any | null>(null);
@@ -1262,6 +1272,7 @@ onMounted(() => {
                   <span class="gb-tree-contact" v-if="session.creator_email">✉️ {{ session.creator_email }}</span>
                   <span class="gb-tree-meta">课程 {{ session.course_id }} · 👥 {{ session.participants?.length || 0 }}人 · 🎁 +{{ session.total_bonus || 0 }}</span>
                   <span class="gb-tree-time">{{ new Date(session.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric' }) }}</span>
+                  <button class="gb-tree-delete" @click.stop="deleteGroupBuy(session)" title="删除">✕</button>
                 </div>
                 <div v-if="expandedGroupBuys.has(session.id)" class="gb-tree-children">
                   <div v-for="p in session.participants" :key="p.id" class="gb-tree-leaf">
@@ -1695,6 +1706,8 @@ onMounted(() => {
 .gb-tree-creator { font-weight: 600; color: var(--text-primary); min-width: 100px; }
 .gb-tree-meta { font-size: 0.8rem; color: var(--text-secondary); flex: 1; }
 .gb-tree-time { font-size: 0.75rem; color: var(--text-light); white-space: nowrap; }
+.gb-tree-delete { background: none; border: none; color: #f56c6c; cursor: pointer; font-size: 0.85rem; padding: 4px 8px; border-radius: 4px; transition: background 0.2s; }
+.gb-tree-delete:hover { background: rgba(245,108,108,0.1); }
 .gb-tree-children { border-top: 1px solid var(--border-color); }
 .gb-tree-leaf {
   display: flex;

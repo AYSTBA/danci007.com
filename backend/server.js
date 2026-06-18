@@ -1191,6 +1191,16 @@ app.get('/api/admin/group-buys', requireAdminAuth, (req, res) => {
   res.json(result);
 });
 
+// 管理员：删除团购（级联删除参与者）
+app.delete('/api/admin/group-buys/:id', requireAdminAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const row = db.prepare('SELECT id FROM group_buy_sessions WHERE id = ?').get(id);
+  if (!row) return res.status(404).json({ error: '团购不存在' });
+  db.prepare('DELETE FROM group_buy_participants WHERE session_id = ?').run(id);
+  db.prepare('DELETE FROM group_buy_sessions WHERE id = ?').run(id);
+  res.json({ success: true });
+});
+
 // 查询某用户参与的所有团购（放在 :shareId 之前，避免冲突）
 app.get('/api/group-buy/user/:userName', (req, res) => {
   const userName = req.params.userName;
