@@ -192,6 +192,11 @@ function viewSession(session: GroupBuySession) {
 function isOwnSession(session: GroupBuySession) {
   return session.creator_name === localName.value.trim();
 }
+
+function hasJoined() {
+  if (!currentSession.value?.participants) return false;
+  return currentSession.value.participants.some(p => p.user_name === localName.value.trim());
+}
 </script>
 
 <template>
@@ -238,10 +243,10 @@ function isOwnSession(session: GroupBuySession) {
                     {{ copyTip ? '✓' : (isZh ? '复制' : 'Copy') }}
                   </button>
                 </div>
-                <button v-if="!joinSuccess && !isOwnSession(currentSession)" class="gb-btn gb-btn-primary gb-btn-block" @click="joinGroupBuy" :disabled="loading">
+                <button v-if="!hasJoined() && !isOwnSession(currentSession)" class="gb-btn gb-btn-primary gb-btn-block" @click="joinGroupBuy" :disabled="loading">
                   {{ loading ? (isZh ? '加入中...' : 'Joining...') : (isZh ? '加入团购' : 'Join') }}
                 </button>
-                <div v-else-if="joinSuccess" class="gb-success">✅ {{ isZh ? '你已加入该团购' : 'Joined!' }}</div>
+                <div v-else-if="hasJoined() || isOwnSession(currentSession)" class="gb-success">✅ {{ isOwnSession(currentSession) ? (isZh ? '你是发起人' : 'You are the host') : (isZh ? '你已加入该团购' : 'Joined!') }}</div>
 
                 <div v-if="currentSession.participants?.length" class="gb-participant-list">
                   <h3>{{ isZh ? '参与者' : 'Participants' }} ({{ currentSession.participants.length }})</h3>
@@ -296,8 +301,8 @@ function isOwnSession(session: GroupBuySession) {
   z-index: 1;
 }
 .gb-container { width: 100%; max-width: 560px; }
-.gb-back { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 0.9rem; cursor: pointer; padding: 8px 0; margin-bottom: 16px; font-family: inherit; }
-.gb-back:hover { color: #fff; }
+.gb-back { background: rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.1); border-radius: 980px; color: #1d1d1f; font-size: 0.9rem; cursor: pointer; padding: 8px 16px; margin-bottom: 16px; font-family: inherit; transition: background 0.2s; }
+.gb-back:hover { background: rgba(0,0,0,0.1); }
 .gb-card { background: rgba(255,255,255,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.5); border-radius: 24px; padding: 40px 32px; }
 .gb-title { font-size: 1.8rem; font-weight: 700; text-align: center; margin: 0 0 8px; color: #1d1d1f; }
 .gb-course-name { text-align: center; color: #6e6e73; font-size: 0.95rem; margin: 0 0 24px; }
