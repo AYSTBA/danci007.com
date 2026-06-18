@@ -664,11 +664,11 @@ const initDb = () => {
   // 迁移：删除旧团购表（含 inviter_name/joiners 列），重建新表
   try {
     const cols = db.prepare("PRAGMA table_info(group_buy_sessions)").all();
-    if (cols.some((c: any) => c.name === 'inviter_name')) {
-      db.exec('DROP TABLE IF EXISTS group_buy_sessions');
+    if (cols.some(c => c.name === 'inviter_name')) {
       db.exec('DROP TABLE IF EXISTS group_buy_participants');
+      db.exec('DROP TABLE IF EXISTS group_buy_sessions');
     }
-  } catch { /* 新安装，表不存在 */ }
+  } catch (e) { /* 新安装 */ }
   db.exec(`
     CREATE TABLE IF NOT EXISTS group_buy_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
