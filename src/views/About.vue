@@ -6,7 +6,7 @@ import { normalizeActive } from '../types'
 import { useLanguage } from '../composables/useLanguage'
 import { useBannerCarousel } from '../composables/useBannerCarousel'
 import { getImageUrl, goBack, fetchJson } from '../utils'
-
+import Grainient from '../components/Grainient.vue'
 
 const router = useRouter()
 const { currentLang } = useLanguage()
@@ -102,7 +102,31 @@ onUnmounted(stopBannerAutoPlay)
 </script>
 
 <template>
-  
+  <Grainient
+    color1="#c1c2c1"
+    color2="#6ad67b"
+    color3="#5584cf"
+    :timeSpeed="1"
+    :colorBalance="0"
+    :warpStrength="0.8"
+    :warpFrequency="5"
+    :warpSpeed="1.9"
+    :warpAmplitude="50"
+    :blendAngle="0"
+    :blendSoftness="0.38"
+    :rotationAmount="850"
+    :noiseScale="2"
+    :grainAmount="0"
+    :grainScale="2"
+    :grainAnimated="false"
+    :contrast="1.55"
+    :gamma="0.95"
+    :saturation="0.95"
+    :centerX="0.09"
+    :centerY="0"
+    :zoom="0.85"
+    class="page-bg"
+  />
   <!-- Loading -->
   <div v-if="loading" class="global-loading">
     <div class="spinner"></div>
@@ -225,7 +249,7 @@ onUnmounted(stopBannerAutoPlay)
 <style scoped>
 .about-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f0faf0 0%, #f8f9fb 50%, #fff 100%);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -689,4 +713,14 @@ onUnmounted(stopBannerAutoPlay)
   }
 }
 
+/* ══════════════════════════════════════════════
+   Page background
+   ══════════════════════════════════════════════ */
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
 </style>

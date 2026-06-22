@@ -7,8 +7,8 @@ import { normalizeActive } from '../types';
 import { useLanguage } from '../composables/useLanguage';
 import { useBannerCarousel } from '../composables/useBannerCarousel';
 import { getImageUrl, getAvatarUrl, renderMarkdown, sanitizeHtml, fetchJson } from '../utils';
-
-
+import DomeGallery from '../components/DomeGallery.vue';
+import Grainient from '../components/Grainient.vue';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -106,9 +106,15 @@ const teachersTitleRef = ref<HTMLElement | null>(null);
 const teachersGridRef = ref<HTMLElement | null>(null);
 const gallerySectionRef = ref<HTMLElement | null>(null);
 const galleryTitleRef = ref<HTMLElement | null>(null);
+const galleryGridRef = ref<HTMLElement | null>(null);
+const curtainRef = ref<HTMLElement | null>(null);
 
 const shouldAnimate = !sessionStorage.getItem('home_animated');
 
+const isMobile = ref(window.innerWidth < 769);
+const domeMinRadius = computed(() => isMobile.value ? 350 : 600);
+
+let ctx: gsap.Context | null = null;
 
 function initAnimations() {
   ctx = gsap.context(() => {
@@ -117,6 +123,15 @@ function initAnimations() {
     if (shouldAnimate) {
       // ── Opening animation (only on fresh page load) ──
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+      // Curtain slides up
+      if (curtainRef.value) {
+        tl.to(curtainRef.value, {
+          y: '-100%',
+          duration: 1.4,
+          ease: 'power4.inOut',
+        });
+      }
 
       // Hero title: compress-restore entrance
       if (heroTitleRef.value) {
@@ -156,7 +171,7 @@ function initAnimations() {
       }
     } else {
       // SPA navigation — no welcome animation, show final state immediately
-
+      if (curtainRef.value) curtainRef.value.style.display = 'none';
       if (heroTextOverlayRef.value) {
         gsap.set(heroTextOverlayRef.value, { opacity: 0 });
       }
@@ -292,6 +307,31 @@ const siteTitle = computed(() => {
 <template>
   <div id="home-root">
     <!-- Background -->
+    <Grainient
+      color1="#c1c2c1"
+      color2="#6ad67b"
+      color3="#5584cf"
+      :timeSpeed="1"
+      :colorBalance="0"
+      :warpStrength="0.8"
+      :warpFrequency="5"
+      :warpSpeed="1.9"
+      :warpAmplitude="50"
+      :blendAngle="0"
+      :blendSoftness="0.38"
+      :rotationAmount="850"
+      :noiseScale="2"
+      :grainAmount="0"
+      :grainScale="2"
+      :grainAnimated="false"
+      :contrast="1.55"
+      :gamma="0.95"
+      :saturation="0.95"
+      :centerX="0.09"
+      :centerY="0"
+      :zoom="0.85"
+      class="page-bg"
+    />
 
     <!-- Loading -->
     <div v-if="loading" class="global-loading">
@@ -308,6 +348,9 @@ const siteTitle = computed(() => {
     </div>
 
     <div v-else class="page-container">
+      <!-- Curtain overlay -->
+      <div ref="curtainRef" class="curtain-overlay"></div>
+
       <!-- 顶部导航栏 -->
       <header class="page-header" :class="{ 'nav-hidden': !isNavVisible }">
         <div class="header-inner">
@@ -444,19 +487,18 @@ const siteTitle = computed(() => {
           <h2 ref="galleryTitleRef" class="section-title">{{ currentLang === 'zh' ? '学员风采' : 'Student Gallery' }}</h2>
           <p class="gallery-subtitle">{{ currentLang === 'zh' ? '记录每一位学员的成长瞬间' : 'Moments of every student\'s growth' }}</p>
         </div>
-        <div class="gallery-grid">
-          <div
-            v-for="(photo, index) in galleryPhotos.slice(0, 8)"
-            :key="index"
-            class="gallery-item"
-          >
-            <img
-              :src="photo.url"
-              :alt="'Gallery ' + (index + 1)"
-              loading="lazy"
-              @error="$event.target.style.display = 'none'"
-            />
-          </div>
+        <div ref="galleryGridRef" class="dome-container">
+          <DomeGallery
+            :images="galleryPhotos.map(p => p.url)"
+            :fit="0.5"
+            :min-radius="domeMinRadius"
+            :image-border-radius="'8px'"
+            :max-vertical-rotation-deg="9"
+            :segments="20"
+            :drag-sensitivity="6"
+            :drag-dampening="3.8"
+            :grayscale="false"
+          />
         </div>
       </section>
 
@@ -483,14 +525,35 @@ const siteTitle = computed(() => {
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════════════
+   Curtain overlay
+   ══════════════════════════════════════════════ */
+.curtain-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #1a1a2e;
+  z-index: 999;
+  pointer-events: none;
+}
 
+/* ══════════════════════════════════════════════
+   Page background (Grainient)
+   ══════════════════════════════════════════════ */
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
 
 /* ══════════════════════════════════════════════
    桌面端基础样式
    ══════════════════════════════════════════════ */
 .page-container {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f0faf0 0%, #f8f9fb 30%, #fff 70%, #f8f9fb 100%);
+  background: transparent;
   position: relative;
   z-index: 1;
   overflow-x: hidden;
@@ -689,10 +752,9 @@ const siteTitle = computed(() => {
 .hero-banner {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  aspect-ratio: 21/9;
+  background: #e8e8e8;
+  border-radius: 20px;
   overflow: hidden;
 }
 
@@ -774,7 +836,7 @@ const siteTitle = computed(() => {
   width: 100%;
   justify-content: center;
   padding: 80px 45px;
-  background: linear-gradient(180deg, #f0faf0 0%, #f8f9fb 30%, #fff 70%, #f8f9fb 100%);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -796,21 +858,37 @@ const siteTitle = computed(() => {
 
 .why-content {
   width: 100%;
-  padding: var(--sp-12) var(--sp-20);
-  border-radius: var(--radius-xl);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-card);
+  padding: 60px 80px;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
 }
 
 .section-title {
-  font-size: var(--fs-2xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--sp-4);
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
   text-align: center;
-  letter-spacing: 0.5px;
+  position: relative;
 }
+
+.section-title::before,
+.section-title::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 1px;
+  background: #ddd;
+}
+
+.section-title::before { top: -20px; }
+.section-title::after { bottom: -20px; }
 
 .md-text {
   color: #555;
@@ -845,7 +923,7 @@ const siteTitle = computed(() => {
   width: 100%;
   justify-content: center;
   padding: 0 45px;
-  background: linear-gradient(180deg, #f0faf0 0%, #f8f9fb 30%, #fff 70%, #f8f9fb 100%);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -867,18 +945,20 @@ const siteTitle = computed(() => {
 }
 
 .teacher-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--sp-6);
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 20px;
+  padding: 30px;
   text-align: center;
-  box-shadow: var(--shadow-card);
-  transition: all 0.3s ease;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.06);
+  transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .teacher-card:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-10px);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.12);
 }
 
 .teacher-avatar {
@@ -940,7 +1020,14 @@ const siteTitle = computed(() => {
   margin-top: 4px;
 }
 
-
+.dome-container {
+  width: 100%;
+  height: 80vh;
+  min-height: 500px;
+  max-height: 800px;
+  position: relative;
+  overflow: hidden;
+}
 
 /* ══════════════════════════════════════════════
    页脚
@@ -949,7 +1036,7 @@ const siteTitle = computed(() => {
   padding: 48px 40px 32px;
   text-align: center;
   border-top: none;
-  background: linear-gradient(180deg, #f0faf0 0%, #f8f9fb 30%, #fff 70%, #f8f9fb 100%);
+  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -1004,7 +1091,12 @@ const siteTitle = computed(() => {
 /* ══════════════════════════════════════════════
    桌面端滚动条
    ══════════════════════════════════════════════ */
-
+@media (min-width: 769px) {
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: rgba(67, 160, 71, 0.4); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(67, 160, 71, 0.7); }
+}
 
 /* ══════════════════════════════════════════════
    平板端
@@ -1080,12 +1172,13 @@ const siteTitle = computed(() => {
   }
 
   .why-section {
-    padding: var(--sp-10) var(--sp-4);
+    padding: 32px 16px;
+    min-height: auto;
   }
 
   .why-inner { padding: 0; align-items: stretch; width: 100%; }
   .why-content-wrapper { width: 100%; }
-  .why-content { width: 100%; padding: var(--sp-5) var(--sp-4); border-radius: var(--radius-lg); }
+  .why-content { width: 100%; padding: 24px 20px; border-radius: 16px; }
 
   .md-text {
     text-align: left;
@@ -1096,10 +1189,16 @@ const siteTitle = computed(() => {
   .md-text h3 { font-size: 17px; margin-top: 24px; margin-bottom: 12px; text-align: left; }
   .md-text p { line-height: 1.7; margin-bottom: 12px; }
 
-  .section-title { font-size: var(--fs-xl); margin-bottom: var(--sp-4); }
+  .section-title { font-size: 20px; margin-bottom: 24px; letter-spacing: 0.5px; }
+  .section-title::before,
+  .section-title::after { width: 60px; }
+  .section-title::before { top: -16px; }
+  .section-title::after { bottom: -16px; }
 
   .teachers-section {
-    padding: var(--sp-10) var(--sp-4);
+    padding: 32px 16px;
+    min-height: auto;
+    justify-content: center;
   }
 
   .teachers-inner { width: 100%; }
@@ -1110,10 +1209,10 @@ const siteTitle = computed(() => {
   .teacher-title { font-size: 13px; margin-bottom: 8px; }
   .teacher-desc { font-size: 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-  .gallery-section { padding: var(--sp-8) var(--sp-4); }
-  .gallery-header .section-title { font-size: var(--fs-xl); }
-  .gallery-subtitle { font-size: var(--fs-sm); }
-  .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); }
+  .gallery-section { padding: 40px 0 10px; }
+  .gallery-header .section-title { font-size: 22px; }
+  .gallery-subtitle { font-size: 13px; }
+  .dome-container { height: 80vh; min-height: 400px; max-height: 700px; }
 
   .page-footer { padding: 32px 16px 24px; }
   .footer-links { gap: 20px; }
