@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import Grainient from '../components/Grainient.vue';
+;
 
 const router = useRouter();
 const route = useRoute();
@@ -195,31 +195,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Grainient
-    color1="#c1c2c1"
-    color2="#6ad67b"
-    color3="#5584cf"
-    :timeSpeed="1"
-    :colorBalance="0"
-    :warpStrength="0.8"
-    :warpFrequency="5"
-    :warpSpeed="1.9"
-    :warpAmplitude="50"
-    :blendAngle="0"
-    :blendSoftness="0.38"
-    :rotationAmount="850"
-    :noiseScale="2"
-    :grainAmount="0"
-    :grainScale="2"
-    :grainAnimated="false"
-    :contrast="1.55"
-    :gamma="0.95"
-    :saturation="0.95"
-    :centerX="0.09"
-    :centerY="0"
-    :zoom="0.85"
-    class="page-bg"
-  />
   <div class="booking-page">
     <!-- 顶部导航（毛玻璃效果 + icon返回） -->
     <header class="page-header" :class="{ 'nav-hidden': !isNavVisible }">
@@ -400,35 +375,11 @@ onUnmounted(() => {
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
-.booking-page::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-  pointer-events: none;
-  z-index: 0;
-}
 
-.booking-page::after {
-  content: '';
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background:
-    radial-gradient(circle at 20% 80%, rgba(255,182,193,0.25) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(173,216,230,0.25) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(221,160,221,0.2) 0%, transparent 50%),
-    radial-gradient(circle at 60% 60%, rgba(255,228,181,0.2) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
-  animation: float 25s ease-in-out infinite;
-}
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
-}
+
+
+
 
 /* ── 顶部导航（毛玻璃效果） ── */
 .page-header {
@@ -1013,14 +964,4 @@ select.input {
   .form-card { padding: 16px 12px; }
 }
 
-/* ══════════════════════════════════════════════
-   Page background
-   ══════════════════════════════════════════════ */
-.page-bg {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
 </style>

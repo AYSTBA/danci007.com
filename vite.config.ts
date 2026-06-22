@@ -27,13 +27,12 @@ export default defineConfig({
   build: {
     target: 'es2020',
     cssTarget: 'es2020',
-    cssCodeSplit: false,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('gsap') || id.includes('ScrollTrigger')) return 'vendor-gsap'
-            if (id.includes('ogl')) return 'vendor-ogl'
             if (id.includes('vue-router')) return 'vendor-router'
             if (id.includes('vue')) return 'vendor-vue'
             return 'vendor'
@@ -43,7 +42,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 80,
+    port: 5188,
     host: '0.0.0.0',
     proxy: {
       '/api': {

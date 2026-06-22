@@ -5,7 +5,7 @@ import ImageEditor from '../components/ImageEditor.vue';
 import type { BookingData, Banner, Teacher, PageContents } from '../types';
 import { normalizeActive } from '../types';
 import { getImageUrl, formatDate, fetchJson } from '../utils';
-import Grainient from '../components/Grainient.vue';
+;
 
 const router = useRouter();
 
@@ -737,31 +737,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <Grainient
-    color1="#c1c2c1"
-    color2="#6ad67b"
-    color3="#5584cf"
-    :timeSpeed="1"
-    :colorBalance="0"
-    :warpStrength="0.8"
-    :warpFrequency="5"
-    :warpSpeed="1.9"
-    :warpAmplitude="50"
-    :blendAngle="0"
-    :blendSoftness="0.38"
-    :rotationAmount="850"
-    :noiseScale="2"
-    :grainAmount="0"
-    :grainScale="2"
-    :grainAnimated="false"
-    :contrast="1.55"
-    :gamma="0.95"
-    :saturation="0.95"
-    :centerX="0.09"
-    :centerY="0"
-    :zoom="0.85"
-    class="page-bg"
-  />
   <div class="admin-page">
     <div v-if="!isLoggedIn" class="login-container">
       <div class="login-box">
