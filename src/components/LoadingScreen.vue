@@ -72,9 +72,8 @@ onUnmounted(() => {
           class="bolt-path"
           pathLength="1"
           :style="{
-            strokeDashoffset: 1,
-            animationDelay: path.delay,
-            animationDuration: path.duration,
+           '--delay': path.delay,
+           '--duration': path.duration,
             opacity: path.opacity,
             strokeWidth: path.strokeWidth,
           }"
@@ -159,6 +158,9 @@ onUnmounted(() => {
   filter: drop-shadow(0 0 3px rgba(184,212,74,0.5)) drop-shadow(0 0 10px rgba(184,212,74,0.2));
   stroke-dasharray: 1;
   animation: boltCrawl ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  animation-duration: var(--duration, 2.5s);
+  stroke-dashoffset: 1;
 }
 
 @keyframes boltCrawl {
@@ -167,14 +169,14 @@ onUnmounted(() => {
     opacity: 0;
   }
   5% {
-    opacity: 0.6;
+    opacity: 0.7;
   }
   50% {
     stroke-dashoffset: 0;
-    opacity: 0.8;
+    opacity: 0.9;
   }
   65% {
-    opacity: 0.6;
+    opacity: 0.7;
   }
   70% {
     opacity: 0.1;
