@@ -219,7 +219,7 @@ function ensureInit() {
   sCanvas.style.inset = '0';
   sCanvas.style.width = '100%';
   sCanvas.style.height = '100%';
-  sCanvas.style.zIndex = '0';
+  sCanvas.style.zIndex = '-1';
   sCanvas.style.pointerEvents = 'none';
   sCanvas.style.display = 'none';
   document.body.appendChild(sCanvas);
