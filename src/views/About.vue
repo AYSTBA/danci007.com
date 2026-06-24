@@ -102,6 +102,7 @@ onUnmounted(stopBannerAutoPlay)
 </script>
 
 <template>
+  <div class="about-root">
   <Grainient
     color1="#c1c2c1"
     color2="#6ad67b"
@@ -244,9 +245,15 @@ onUnmounted(stopBannerAutoPlay)
     </footer>
 
   </div>
+  </div>
 </template>
 
 <style scoped>
+.about-root {
+  position: relative;
+  min-height: 100vh;
+}
+
 .about-page {
   min-height: 100vh;
   background: transparent;
@@ -713,8 +720,11 @@ onUnmounted(stopBannerAutoPlay)
   }
 }
 
+</style>
+
+<style>
 /* ══════════════════════════════════════════════
-   Page background
+   Page background — unscoped so it applies to Grainient's root div
    ══════════════════════════════════════════════ */
 .page-bg {
   position: fixed;
