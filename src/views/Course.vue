@@ -47,9 +47,11 @@ const commentSubmitted = ref(false);
 // 分享 toast
 const showCopyTip = ref(false);
 
-// ── 图片 fallback ──
+// ── 图片 fallback（防无限循环）──
 const handleImgError = (e: Event) => {
   const img = e.target as HTMLImageElement;
+  if (img.dataset.errFixed) return;
+  img.dataset.errFixed = 'true';
   img.src = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225">'
     + '<rect width="400" height="225" fill="#e8eef3"/>'
@@ -59,7 +61,10 @@ const handleImgError = (e: Event) => {
 };
 
 const handleListImgError = (e: Event) => {
-  (e.target as HTMLImageElement).style.display = 'none';
+  const img = e.target as HTMLImageElement;
+  if (img.dataset.errFixed) return;
+  img.dataset.errFixed = 'true';
+  img.style.display = 'none';
 };
 
 // ── 列表加载 ──
@@ -68,7 +73,7 @@ const loadList = async () => {
   listError.value = null;
   try {
     const data = await fetchJson<Course[]>('/api/courses');
-    courseList.value = data;
+    courseList.value = Array.isArray(data) ? data : [];
   } catch (e: any) {
     listError.value = e.message || '加载失败';
   } finally {
@@ -82,6 +87,7 @@ const loadDetail = async () => {
   error.value = null;
   try {
     const data = await fetchJson<Course>(`/api/courses/${courseId.value}`);
+    if (!data) { throw new Error('Empty response'); }
     try { data.features = JSON.parse((data as any).features || '[]'); } catch { data.features = []; }
     course.value = data;
   } catch (err: any) {
@@ -201,10 +207,11 @@ const avgRating = computed(() => {
 });
 
 const renderStars = (rating: number) => {
-  return '\u2605'.repeat(rating) + '\u2606'.repeat(5 - rating);
+  const r = Math.max(0, Math.min(5, Math.round(rating)));
+  return '\u2605'.repeat(r) + '\u2606'.repeat(5 - r);
 };
 
-const t = (zh: string, en: string) => isZh.value ? zh : en;
+const t = (zh: string, en: string) => (isZh.value ? zh : en) || '';
 
 watch(activeTab, (tab) => {
   if (tab === 'review') loadReviews();
