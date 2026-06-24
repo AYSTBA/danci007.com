@@ -107,7 +107,7 @@ onUnmounted(() => {
 @font-face {
   font-family: 'SmileySans';
   src: url('/fonts/SmileySans-Oblique.ttf') format('truetype');
-  font-display: block;
+  font-display: swap;
 }
 
 .loading-wrapper {
