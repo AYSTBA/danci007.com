@@ -162,11 +162,12 @@ void main(){
 }
 `;
 
-// === Shared singleton WebGL context (canvas permanently in document.body, never removed) ===
+// === Shared singleton WebGL context (canvas permanently in body wrapper, never removed) ===
 let sRenderer: Renderer | null = null;
 let sProgram: Program | null = null;
 let sMesh: Mesh | null = null;
 let sCanvas: HTMLCanvasElement | null = null;
+let sWrap: HTMLDivElement | null = null;
 let sRaf = 0;
 let sT0 = 0;
 let sCount = 0;
@@ -215,14 +216,11 @@ function ensureInit() {
 
   const gl = sRenderer.gl;
   sCanvas = gl.canvas as HTMLCanvasElement;
-  sCanvas.style.position = 'fixed';
-  sCanvas.style.inset = '0';
-  sCanvas.style.width = '100%';
-  sCanvas.style.height = '100%';
-  sCanvas.style.zIndex = '-1';
-  sCanvas.style.pointerEvents = 'none';
-  sCanvas.style.display = 'none';
-  document.body.appendChild(sCanvas);
+  sWrap = document.createElement('div');
+  sWrap.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;display:none';
+  sCanvas.style.cssText = 'width:100%;height:100%;display:block';
+  sWrap.appendChild(sCanvas);
+  document.body.insertBefore(sWrap, document.body.firstChild);
 
   const geometry = new Triangle(gl);
   sProgram = new Program(gl, {
@@ -269,18 +267,18 @@ function ensureInit() {
 
 function activate() {
   sCount++;
-  if (sCanvas) sCanvas.style.display = 'block';
-  syncUniforms();
-  sSetSize();
   sVisible = true;
   sPageVisible = !document.hidden;
+  if (sWrap) sWrap.style.display = 'block';
+  syncUniforms();
+  sSetSize();
   sStart();
 }
 
 function deactivate() {
   sCount--;
-  if (sCount <= 0 && sCanvas) {
-    sCanvas.style.display = 'none';
+  if (sCount <= 0) {
+    if (sWrap) sWrap.style.display = 'none';
     sVisible = false;
     sStop();
   }
@@ -321,13 +319,13 @@ function syncUniforms() {
 
 onMounted(() => {
   if (isMobile) return;
-  ensureInit();
-  activate();
+  try { ensureInit(); } catch {}
+  try { activate(); } catch {}
 });
 
 onUnmounted(() => {
   if (isMobile) return;
-  deactivate();
+  try { deactivate(); } catch {}
 });
 
 watch(
