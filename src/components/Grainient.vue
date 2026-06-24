@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { onMounted, onUnmounted, watch, computed } from 'vue';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 
 const props = withDefaults(defineProps<{
@@ -54,12 +54,12 @@ const props = withDefaults(defineProps<{
 
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
 
-const cssGradientStyle = computed(() => {
-  if (!isMobile) return {};
-  return {
-    background: `linear-gradient(135deg, ${props.color1} 0%, ${props.color2} 50%, ${props.color3} 100%)`,
-  };
-});
+const cssGradientStyle = computed(() => ({
+  background: `linear-gradient(135deg, ${props.color1} 0%, ${props.color2} 50%, ${props.color3} 100%)`,
+}));
+
+// === Desktop: no template rendered — canvas is managed as fixed fullscreen overlay in document.body
+// === Mobile: renders CSS gradient instead of WebGL
 
 function hexToRgb(hex: string): [number, number, number] {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -162,7 +162,7 @@ void main(){
 }
 `;
 
-// === Shared singleton WebGL context (never destroyed, only one ever exists) ===
+// === Shared singleton WebGL context (canvas permanently in document.body, never removed) ===
 let sRenderer: Renderer | null = null;
 let sProgram: Program | null = null;
 let sMesh: Mesh | null = null;
@@ -170,9 +170,9 @@ let sCanvas: HTMLCanvasElement | null = null;
 let sRaf = 0;
 let sT0 = 0;
 let sCount = 0;
-let sContainer: HTMLElement | null = null;
-let sVisible = true;
+let sVisible = false;
 let sPageVisible = true;
+let sInitDone = false;
 
 function sLoop(t: number) {
   if (!sProgram || !sRenderer || !sMesh) return;
@@ -191,11 +191,10 @@ function sStop() {
 }
 
 function sSetSize() {
-  if (!sRenderer || !sProgram || !sMesh || !sContainer) return;
+  if (!sRenderer || !sProgram || !sMesh || !sCanvas) return;
   const gl = sRenderer.gl;
-  const rect = sContainer.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width));
-  const h = Math.max(1, Math.floor(rect.height));
+  const w = Math.max(1, Math.floor(window.innerWidth));
+  const h = Math.max(1, Math.floor(window.innerHeight));
   sRenderer.setSize(w, h);
   const res = sProgram.uniforms.iResolution.value as Float32Array;
   res[0] = gl.drawingBufferWidth;
@@ -203,27 +202,9 @@ function sSetSize() {
   sRenderer.render({ scene: sMesh });
 }
 
-// One-time global visibility listener
-document.addEventListener('visibilitychange', () => {
-  sPageVisible = !document.hidden;
-  sPageVisible ? sStart() : sStop();
-});
-
-function initShared(container: HTMLElement) {
-  sCount++;
-  if (sRenderer) {
-    if (sContainer && sCanvas && sCanvas.parentNode === sContainer) {
-      try { sContainer.removeChild(sCanvas); } catch {}
-    }
-    sContainer = container;
-    container.appendChild(sCanvas!);
-    syncUniforms();
-    sSetSize();
-    sVisible = true;
-    sPageVisible = !document.hidden;
-    sStart();
-    return;
-  }
+function ensureInit() {
+  if (sInitDone) return;
+  sInitDone = true;
 
   sRenderer = new Renderer({
     webgl: 2 as any,
@@ -234,11 +215,14 @@ function initShared(container: HTMLElement) {
 
   const gl = sRenderer.gl;
   sCanvas = gl.canvas as HTMLCanvasElement;
+  sCanvas.style.position = 'fixed';
+  sCanvas.style.inset = '0';
   sCanvas.style.width = '100%';
   sCanvas.style.height = '100%';
-  sCanvas.style.display = 'block';
-  sContainer = container;
-  container.appendChild(sCanvas);
+  sCanvas.style.zIndex = '0';
+  sCanvas.style.pointerEvents = 'none';
+  sCanvas.style.display = 'none';
+  document.body.appendChild(sCanvas);
 
   const geometry = new Triangle(gl);
   sProgram = new Program(gl, {
@@ -274,20 +258,30 @@ function initShared(container: HTMLElement) {
   sMesh = new Mesh(gl, { geometry, program: sProgram });
 
   window.addEventListener('resize', sSetSize);
+  document.addEventListener('visibilitychange', () => {
+    sPageVisible = !document.hidden;
+    sPageVisible ? sStart() : sStop();
+  });
 
   sT0 = performance.now();
+  sSetSize();
+}
+
+function activate() {
+  sCount++;
+  if (sCanvas) sCanvas.style.display = 'block';
   syncUniforms();
   sSetSize();
+  sVisible = true;
+  sPageVisible = !document.hidden;
   sStart();
 }
 
-function releaseShared() {
+function deactivate() {
   sCount--;
-  if (sCanvas && sContainer && sCanvas.parentNode === sContainer) {
-    try { sContainer.removeChild(sCanvas); } catch {}
-  }
-  sContainer = null;
-  if (sCount <= 0) {
+  if (sCount <= 0 && sCanvas) {
+    sCanvas.style.display = 'none';
+    sVisible = false;
     sStop();
   }
 }
@@ -325,28 +319,15 @@ function syncUniforms() {
   arr3[0] = c3[0]; arr3[1] = c3[1]; arr3[2] = c3[2];
 }
 
-const containerRef = ref<HTMLElement | null>(null);
-let io: IntersectionObserver | null = null;
-
 onMounted(() => {
-  const container = containerRef.value;
-  if (!container) return;
-
-  initShared(container);
-
-  io = new IntersectionObserver(
-    ([entry]) => {
-      sVisible = entry.isIntersecting;
-      sVisible ? sStart() : sStop();
-    },
-    { threshold: 0 }
-  );
-  io.observe(container);
+  if (isMobile) return;
+  ensureInit();
+  activate();
 });
 
 onUnmounted(() => {
-  if (io) { io.disconnect(); io = null; }
-  releaseShared();
+  if (isMobile) return;
+  deactivate();
 });
 
 watch(
@@ -367,11 +348,6 @@ watch(
     v-if="isMobile"
     :class="['grainient-container', className].filter(Boolean).join(' ')"
     :style="cssGradientStyle"
-  />
-  <div
-    v-else
-    ref="containerRef"
-    :class="['grainient-container', className].filter(Boolean).join(' ')"
   />
 </template>
 
