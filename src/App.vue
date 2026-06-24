@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch, onMounted } from 'vue'
+import LoadingScreen from './components/LoadingScreen.vue'
 import { useRoute } from 'vue-router'
 import MobileTabBar from './components/MobileTabBar.vue'
 
@@ -32,6 +33,7 @@ watch(() => route.fullPath, (p) => trackVisit(p))
 </script>
 
 <template>
+  <LoadingScreen>
   <div class="app" :class="{ 'no-tab-bar': !isMobileTabBarVisible }">
     <router-view v-slot="{ Component }">
       <transition name="fade" mode="out-in">
@@ -41,6 +43,7 @@ watch(() => route.fullPath, (p) => trackVisit(p))
     <!-- 移动端底部磨砂玻璃导航栏（课程详情页与后台页面使用自定义底部栏时不显示） -->
     <MobileTabBar v-if="isMobileTabBarVisible" />
   </div>
+  </LoadingScreen>
 </template>
 
 <style scoped>
