@@ -274,6 +274,12 @@ onUnmounted(() => {
   if (raf !== 0) { cancelAnimationFrame(raf); raf = 0; }
   cleanupFns.forEach(fn => fn());
   cleanupFns = [];
+  if (renderer) {
+    try { renderer.gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
+    renderer = null;
+    program = null;
+    mesh = null;
+  }
 });
 
 // Watch props and sync to uniforms
