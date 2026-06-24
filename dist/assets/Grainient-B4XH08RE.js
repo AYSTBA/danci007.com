@@ -1,4 +1,4 @@
-import{C as e,O as t,S as n,Z as r,j as i,p as a,v as o,x as s}from"./vendor-router-DHxAAZF5.js";import{t as c}from"./index-Doh-XazY.js";import{i as l,n as u,r as d,t as f}from"./vendor-ogl-Ce4ZcFQO.js";var p=`#version 300 es
+import{C as e,O as t,S as n,Z as r,j as i,p as a,v as o,x as s}from"./vendor-router-DHxAAZF5.js";import{t as c}from"./index-CAI5wC94.js";import{i as l,n as u,r as d,t as f}from"./vendor-ogl-Ce4ZcFQO.js";var p=`#version 300 es
 in vec2 position;
 void main() {
   gl_Position = vec4(position, 0.0, 1.0);

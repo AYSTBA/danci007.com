@@ -1,6 +1,7 @@
 ﻿<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 
+const shouldShow = ref(false)
 const progress = ref(0)
 const isComplete = ref(false)
 const showContent = ref(false)
@@ -44,11 +45,19 @@ function animate(timestamp: number) {
 }
 
 onMounted(() => {
+  if (sessionStorage.getItem('loaded')) {
+    showContent.value = true
+    return
+  }
+  shouldShow.value = true
   animationId = requestAnimationFrame(animate)
+  setTimeout(() => {
+    sessionStorage.setItem('loaded', '1')
+  }, DURATION + 800)
 })
 
 onUnmounted(() => {
-  cancelAnimationFrame(animationId)
+  if (animationId) cancelAnimationFrame(animationId)
 })
 </script>
 
@@ -58,7 +67,7 @@ onUnmounted(() => {
       <slot />
     </div>
 
-    <div class="loading-overlay" :class="{ 'slide-out': isComplete }">
+    <div v-if="shouldShow" class="loading-overlay" :class="{ 'slide-out': isComplete }">
       <!-- SVG 闪电路径 — 从右上往下缓慢闪动 -->
       <svg
         class="lightning-svg"
