@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
@@ -490,6 +490,17 @@ app.get('/api/admin/server-stats', requireAdminAuth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── 后端首页 & 文档（必须在 static 之前）──
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'backend.html'));
+});
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'docs.html'));
+});
+app.get('/docs/api.md', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'docs', 'API.md'));
 });
 
 // 生产环境：服务 Vite 构建输出的静态文件
@@ -1286,19 +1297,6 @@ app.delete('/api/course-interactions/:id', requireAdminAuth, (req, res) => {
 app.get('/api/admin/course-interactions', requireAdminAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM course_interactions ORDER BY created_at DESC').all();
   res.json(rows);
-});
-
-// ── 后端首页 & 文档 ──
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'backend.html'));
-});
-
-app.get('/docs', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'docs.html'));
-});
-
-app.get('/docs/api.md', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'docs', 'API.md'));
 });
 
 // SPA fallback：所有非 API 路由返回 index.html
