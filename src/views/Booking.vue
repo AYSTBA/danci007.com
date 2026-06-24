@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useDevice } from '../composables/useDevice';
 
 const router = useRouter();
 const route = useRoute();
+const { isMobile } = useDevice();
 const currentLang = ref(localStorage.getItem('language') || 'zh');
 const pageContents = ref<Record<string, string>>({});
 const currentRotatingIndex = ref(0);
@@ -992,5 +994,71 @@ select.input {
    ══════════════════════════════════════════════ */
 .page-bg {
   display: none;
+}
+
+/* ══════════════════════════════════════════════
+   移动端极致内存优化
+   ══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* 禁用昂贵的 backdrop-filter */
+  .page-header,
+  .form-card,
+  .success-card,
+  .hours-card,
+  .contact-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* 简化背景动画，减少 GPU 负担 */
+  .booking-page::after {
+    animation: none;
+  }
+
+  /* 使用 contain 优化渲染性能 */
+  .booking-page {
+    contain: layout style;
+  }
+
+  /* 减少卡片阴影层数 */
+  .form-card,
+  .success-card,
+  .hours-card {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* 简化过渡动画 */
+  .contact-card,
+  .back-btn,
+  .lang-dropdown-btn,
+  .submit-btn,
+  .btn-primary,
+  .btn-outline,
+  .save-btn {
+    transition: opacity 0.15s;
+  }
+
+  /* 移除不必要的 hover 效果 */
+  .contact-card:active {
+    transform: none;
+  }
+
+  /* 优化表单输入框 */
+  .input {
+    -webkit-appearance: none;
+    appearance: none;
+    font-size: 16px; /* 防止 iOS 缩放 */
+  }
+
+  /* 减少动画帧数 */
+  .rotating-text-item {
+    transition: opacity 0.3s;
+  }
+
+  /* 简化模态框动画 */
+  @keyframes modalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 </style>
