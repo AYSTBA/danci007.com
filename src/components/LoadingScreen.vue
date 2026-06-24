@@ -9,30 +9,23 @@ let animationId: number
 let startTime = 0
 const DURATION = 3000
 
-interface Bolt {
-  id: number
-  x: string
-  y: string
-  size: number
-  delay: number
-  duration: number
-  rotation: number
+interface LightningPath {
+  d: string
+  delay: string
+  duration: string
   opacity: number
+  strokeWidth: number
 }
 
-const bolts: Bolt[] = []
-for (let i = 0; i < 10; i++) {
-  bolts.push({
-    id: i,
-    x: `${10 + Math.random() * 80}%`,
-    y: `${5 + Math.random() * 85}%`,
-    size: 24 + Math.random() * 48,
-    delay: Math.random() * 4,
-    duration: 1.5 + Math.random() * 2.5,
-    rotation: Math.random() * 360,
-    opacity: 0.15 + Math.random() * 0.4,
-  })
-}
+const lightningPaths: LightningPath[] = [
+  { d: 'M92,2 L82,14 L93,18 L78,34 L89,39 L72,56 L84,61 L68,78 L80,83', delay: '0s', duration: '2.5s', opacity: 0.45, strokeWidth: 0.3 },
+  { d: 'M78,34 L72,40 L78,43 L68,52', delay: '0.4s', duration: '1.8s', opacity: 0.3, strokeWidth: 0.2 },
+  { d: 'M89,39 L83,46 L88,49 L76,60', delay: '0.7s', duration: '1.5s', opacity: 0.25, strokeWidth: 0.2 },
+  { d: 'M96,1 L90,10 L95,13 L85,24', delay: '0.2s', duration: '2s', opacity: 0.35, strokeWidth: 0.25 },
+  { d: 'M72,56 L66,62 L72,65 L63,74', delay: '1s', duration: '1.5s', opacity: 0.25, strokeWidth: 0.2 },
+  { d: 'M98,1 L94,8 L97,10 L92,18', delay: '0s', duration: '2.8s', opacity: 0.2, strokeWidth: 0.15 },
+  { d: 'M68,78 L62,84 L68,86 L60,94', delay: '1.3s', duration: '1.2s', opacity: 0.2, strokeWidth: 0.15 },
+]
 
 function animate(timestamp: number) {
   if (!startTime) startTime = timestamp
@@ -66,37 +59,45 @@ onUnmounted(() => {
     </div>
 
     <div class="loading-overlay" :class="{ 'slide-out': isComplete }">
-      <div class="lightning-bg">
-        <span
-          v-for="bolt in bolts"
-          :key="bolt.id"
-          class="bolt"
+      <!-- SVG 闪电路径 — 从右上往下缓慢闪动 -->
+      <svg
+        class="lightning-svg"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="xMidYMin slice"
+      >
+        <path
+          v-for="(path, i) in lightningPaths"
+          :key="i"
+          :d="path.d"
+          class="bolt-path"
+          pathLength="1"
           :style="{
-            left: bolt.x,
-            top: bolt.y,
-            fontSize: bolt.size + 'px',
-            animationDelay: bolt.delay + 's',
-            animationDuration: bolt.duration + 's',
-            transform: `rotate(${bolt.rotation}deg) scale(${0.6 + bolt.size / 80})`,
-            opacity: bolt.opacity,
+            strokeDashoffset: 1,
+            animationDelay: path.delay,
+            animationDuration: path.duration,
+            opacity: path.opacity,
+            strokeWidth: path.strokeWidth,
           }"
-        >⚡</span>
-      </div>
+        />
+      </svg>
 
-      <div class="glow-spot glow-1"></div>
-      <div class="glow-spot glow-2"></div>
+      <!-- 黄色辉光 -->
+      <div class="glow glow-1"></div>
+      <div class="glow glow-2"></div>
 
-      <div class="center-content">
+      <!-- 标题区 — 居左 -->
+      <div class="title-area">
         <h1 class="site-title">
           <span class="title-char" v-for="(ch, i) in '中萱文化'" :key="i" :style="{ animationDelay: i * 0.08 + 's' }">{{ ch }}</span>
         </h1>
         <p class="site-subtitle">青少年英语教育</p>
+      </div>
 
-        <div class="progress-area">
-          <div class="percentage">{{ progress }}%</div>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: progress + '%' }"></div>
-          </div>
+      <!-- 底部进度区 -->
+      <div class="bottom-area">
+        <div class="percentage">{{ progress }}%</div>
+        <div class="progress-track">
+          <div class="progress-fill" :style="{ width: progress + '%' }"></div>
         </div>
       </div>
     </div>
@@ -104,11 +105,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@font-face {
+  font-family: 'SmileySans';
+  src: url('/fonts/SmileySans-Oblique.ttf') format('truetype');
+  font-display: block;
+}
+
 .loading-wrapper {
   position: relative;
   width: 100%;
   min-height: 100vh;
-  overflow: hidden;
   background: #000;
 }
 
@@ -116,19 +122,18 @@ onUnmounted(() => {
   position: relative;
   z-index: 1;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.6s ease;
 }
 .main-content.content-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .loading-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: #000;
   transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1);
 }
@@ -136,30 +141,61 @@ onUnmounted(() => {
   transform: translateX(-100%);
 }
 
-.lightning-bg {
+/* ===== SVG 闪电 ===== */
+.lightning-svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: 0;
 }
-.bolt {
-  position: absolute;
-  color: #facc15;
-  filter: drop-shadow(0 0 6px #facc15) drop-shadow(0 0 20px #eab308);
-  animation: boltFlash ease-in-out infinite;
-  will-change: opacity, transform;
-  user-select: none;
+
+.bolt-path {
+  fill: none;
+  stroke: #b8d44a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(184,212,74,0.5)) drop-shadow(0 0 10px rgba(184,212,74,0.2));
+  stroke-dasharray: 1;
+  animation: boltCrawl ease-in-out infinite;
 }
 
-@keyframes boltFlash {
-  0%, 100% { opacity: 0; transform: scale(0.8); }
-  10% { opacity: 1; transform: scale(1.15); }
-  15% { opacity: 0.3; transform: scale(1); }
-  20% { opacity: 0.8; transform: scale(1.05); }
-  30%, 100% { opacity: 0; transform: scale(0.7); }
+@keyframes boltCrawl {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  5% {
+    opacity: 0.6;
+  }
+  50% {
+    stroke-dashoffset: 0;
+    opacity: 0.8;
+  }
+  65% {
+    opacity: 0.6;
+  }
+  70% {
+    opacity: 0.1;
+  }
+  75% {
+    opacity: 0.5;
+  }
+  80% {
+    opacity: 0.05;
+  }
+  85% {
+    opacity: 0.3;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
 }
 
-.glow-spot {
+/* ===== 辉光 ===== */
+.glow {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
@@ -170,82 +206,90 @@ onUnmounted(() => {
 .glow-1 {
   width: 300px;
   height: 300px;
-  top: 15%;
-  left: 20%;
-  background: radial-gradient(circle, rgba(250,204,21,0.25) 0%, transparent 70%);
+  top: 10%;
+  right: 10%;
+  background: radial-gradient(circle, rgba(184,212,74,0.18) 0%, transparent 70%);
 }
 .glow-2 {
-  width: 250px;
-  height: 250px;
-  bottom: 20%;
-  right: 15%;
-  background: radial-gradient(circle, rgba(234,179,8,0.18) 0%, transparent 70%);
+  width: 200px;
+  height: 200px;
+  bottom: 25%;
+  right: 30%;
+  background: radial-gradient(circle, rgba(184,212,74,0.1) 0%, transparent 70%);
   animation-delay: -2s;
 }
 
 @keyframes glowPulse {
   0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.3); }
+  50% { opacity: 0.8; transform: scale(1.4); }
 }
 
-.center-content {
-  position: relative;
+/* ===== 标题区 — 居左 ===== */
+.title-area {
+  position: absolute;
+  top: 18%;
+  left: 0;
+  right: 0;
   z-index: 1;
-  text-align: center;
-  padding: 0 24px;
-  max-width: 600px;
-  width: 100%;
+  padding: 0 7vw;
+  text-align: left;
 }
 
 .site-title {
-  margin: 0 0 12px;
-  font-size: clamp(40px, 8vw, 72px);
-  font-weight: 800;
+  margin: 0 0 8px;
+  font-family: 'SmileySans', sans-serif;
+  font-size: clamp(42px, 9vw, 80px);
+  font-weight: 700;
   color: #fff;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   display: flex;
-  justify-content: center;
-  gap: 4px;
+  gap: 2px;
 }
 .title-char {
   display: inline-block;
   animation: charAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-  text-shadow: 0 0 30px rgba(250,204,21,0.3), 0 0 60px rgba(250,204,21,0.1);
+  text-shadow: 0 0 30px rgba(250,204,21,0.25), 0 0 60px rgba(250,204,21,0.08);
 }
 @keyframes charAppear {
-  0% { opacity: 0; transform: translateY(30px) scale(0.8); }
+  0% { opacity: 0; transform: translateY(30px) scale(0.85); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .site-subtitle {
-  margin: 0 0 48px;
-  font-size: clamp(14px, 2.5vw, 20px);
-  color: rgba(255,255,255,0.6);
-  letter-spacing: 0.3em;
-  font-weight: 300;
+  margin: 0;
+  font-family: 'SmileySans', sans-serif;
+  font-size: clamp(13px, 2.2vw, 18px);
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.25em;
+  font-weight: 350;
 }
 
-.progress-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+/* ===== 底部进度区 ===== */
+.bottom-area {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding: 0 7vw max(24px, env(safe-area-inset-bottom, 16px));
 }
 
 .percentage {
-  font-size: clamp(28px, 5vw, 48px);
+  font-family: 'SmileySans', sans-serif;
+  font-size: clamp(20px, 3.5vw, 32px);
   font-weight: 700;
   color: #22c55e;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 2px;
-  text-shadow: 0 0 20px rgba(34,197,94,0.4);
+  letter-spacing: 1px;
+  text-shadow: 0 0 16px rgba(34,197,94,0.35);
+  margin-bottom: 8px;
 }
 
 .progress-track {
-  width: min(420px, 75vw);
-  height: 6px;
+  width: 100%;
+  height: 5px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.08);
   overflow: hidden;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
 }
@@ -255,7 +299,7 @@ onUnmounted(() => {
   border-radius: 3px;
   background: linear-gradient(90deg, #22c55e, #4ade80);
   transition: width 0.05s linear;
-  box-shadow: 0 0 12px rgba(34,197,94,0.5), 0 0 30px rgba(34,197,94,0.2);
+  box-shadow: 0 0 10px rgba(34,197,94,0.45), 0 0 25px rgba(34,197,94,0.15);
   position: relative;
 }
 .progress-fill::after {
@@ -263,25 +307,30 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   top: -2px;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #4ade80;
-  box-shadow: 0 0 16px rgba(34,197,94,0.7);
+  box-shadow: 0 0 14px rgba(34,197,94,0.6);
 }
 
+/* ===== 响应式 ===== */
 @media (max-width: 480px) {
+  .title-area {
+    top: 15%;
+    padding: 0 6vw;
+  }
+  .bottom-area {
+    padding: 0 6vw max(16px, env(safe-area-inset-bottom, 12px));
+  }
   .glow-1, .glow-2 {
     display: none;
   }
-  .site-subtitle {
-    margin-bottom: 36px;
-  }
-  .progress-track {
-    width: 70vw;
-  }
-  .bolt {
-    font-size: 20px !important;
+}
+
+@media (max-width: 360px) {
+  .title-area {
+    top: 12%;
   }
 }
 </style>
