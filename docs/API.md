@@ -1,5 +1,16 @@
-# 单词突击007 - API 文档
+﻿# 单词突击007 - API 文档
 
+> **项目简介：** 单词突击007 是一款基于艾宾浩斯遗忘曲线理论的智能单词学习系统，包含官方网站、团购拼课、管理后台、访客分析、服务器监控等模块。前端基于 Vue 3 + Vite + TypeScript，后端基于 Node.js + Express + SQLite。
+>
+> **技术栈：** Vue 3 · TypeScript · Vite · Node.js · Express · SQLite · Sharp
+>
+> - **前端地址：** http://localhost:80（开发）| https://your-domain.com（生产）
+> - **后端地址：** http://localhost:3001（开发）| https://api.your-domain.com（生产）
+> - **管理后台：** http://localhost:3001/admin（开发）| https://your-domain.com/admin（生产）
+> - **GitHub 仓库：** https://github.com/AYSTBA/danci007.com
+>
+> ---
+>
 **Base URL (生产):** `https://your-domain.com`   
 **Base URL (开发):** `http://localhost:3001`  
 **Content-Type:** `application/json` (除了文件上传)
@@ -1118,11 +1129,12 @@ async function submitBooking(name, phone, date, time, course) {
 
 ## 🔗 相关链接
 
-- **前端地址：<ADDRESS_REMOVED>
-- **管理后台：<ADDRESS_REMOVED>
+- **前端地址：** http://localhost:80（开发）| https://your-domain.com（生产）
+- **管理后台：** http://localhost:3001/admin（开发）| https://your-domain.com/admin（生产）
 - **GitHub 仓库：** https://github.com/AYSTBA/danci007.com
 
 ---
 
 **文档版本：** 1.1.0  
 **最后更新：** 2026-06-07
+

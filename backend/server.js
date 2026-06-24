@@ -1288,6 +1288,19 @@ app.get('/api/admin/course-interactions', requireAdminAuth, (req, res) => {
   res.json(rows);
 });
 
+// ── 后端首页 & 文档 ──
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'backend.html'));
+});
+
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'docs.html'));
+});
+
+app.get('/docs/api.md', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'docs', 'API.md'));
+});
+
 // SPA fallback：所有非 API 路由返回 index.html
 const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
 if (existsSync(distDir) && existsSync(indexPath)) {
