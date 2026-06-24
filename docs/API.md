@@ -1127,13 +1127,6 @@ async function submitBooking(name, phone, date, time, course) {
 
 ---
 
-## 🔗 相关链接
-
-- **前端地址：** http://localhost:80（开发）| https://your-domain.com（生产）
-- **管理后台：** http://localhost:3001/admin（开发）| https://your-domain.com/admin（生产）
-- **GitHub 仓库：** https://github.com/AYSTBA/danci007.com
-
----
 
 **文档版本：** 1.1.0  
 **最后更新：** 2026-06-07
