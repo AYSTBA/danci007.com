@@ -162,136 +162,193 @@ void main(){
 }
 `;
 
-const containerRef = ref<HTMLElement | null>(null);
-let renderer: Renderer | null = null;
-let program: Program | null = null;
-let mesh: Mesh | null = null;
-let raf = 0;
-let t0 = 0;
-let isVisible = true;
-let isPageVisible = true;
-let cleanupFns: (() => void)[] = [];
+// === Shared singleton WebGL context (never destroyed, only one ever exists) ===
+let sRenderer: Renderer | null = null;
+let sProgram: Program | null = null;
+let sMesh: Mesh | null = null;
+let sCanvas: HTMLCanvasElement | null = null;
+let sRaf = 0;
+let sT0 = 0;
+let sCount = 0;
+let sContainer: HTMLElement | null = null;
+let sVisible = true;
+let sPageVisible = true;
 
-function build() {
-  const container = containerRef.value;
-  if (!container) return;
+function sLoop(t: number) {
+  if (!sProgram || !sRenderer || !sMesh) return;
+  sProgram.uniforms.iTime.value = (t - sT0) * 0.001;
+  sRenderer.render({ scene: sMesh });
+  sRaf = requestAnimationFrame(sLoop);
+}
 
-  renderer = new Renderer({
+function sStart() {
+  if (sVisible && sPageVisible && sRaf === 0 && sRenderer) {
+    sRaf = requestAnimationFrame(sLoop);
+  }
+}
+function sStop() {
+  if (sRaf !== 0) { cancelAnimationFrame(sRaf); sRaf = 0; }
+}
+
+function sSetSize() {
+  if (!sRenderer || !sProgram || !sMesh || !sContainer) return;
+  const gl = sRenderer.gl;
+  const rect = sContainer.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width));
+  const h = Math.max(1, Math.floor(rect.height));
+  sRenderer.setSize(w, h);
+  const res = sProgram.uniforms.iResolution.value as Float32Array;
+  res[0] = gl.drawingBufferWidth;
+  res[1] = gl.drawingBufferHeight;
+  sRenderer.render({ scene: sMesh });
+}
+
+// One-time global visibility listener
+document.addEventListener('visibilitychange', () => {
+  sPageVisible = !document.hidden;
+  sPageVisible ? sStart() : sStop();
+});
+
+function initShared(container: HTMLElement) {
+  sCount++;
+  if (sRenderer) {
+    if (sContainer && sCanvas && sCanvas.parentNode === sContainer) {
+      try { sContainer.removeChild(sCanvas); } catch {}
+    }
+    sContainer = container;
+    container.appendChild(sCanvas!);
+    syncUniforms();
+    sSetSize();
+    sVisible = true;
+    sPageVisible = !document.hidden;
+    sStart();
+    return;
+  }
+
+  sRenderer = new Renderer({
     webgl: 2 as any,
     alpha: true,
     antialias: false,
     dpr: Math.min(window.devicePixelRatio || 1, 2),
   });
 
-  const gl = renderer.gl;
-  const canvas = gl.canvas as HTMLCanvasElement;
-  canvas.style.width = '100%';
-  canvas.style.height = '100%';
-  canvas.style.display = 'block';
-  container.appendChild(canvas);
-  cleanupFns.push(() => { try { container.removeChild(canvas); } catch { /* ignore */ } });
+  const gl = sRenderer.gl;
+  sCanvas = gl.canvas as HTMLCanvasElement;
+  sCanvas.style.width = '100%';
+  sCanvas.style.height = '100%';
+  sCanvas.style.display = 'block';
+  sContainer = container;
+  container.appendChild(sCanvas);
 
   const geometry = new Triangle(gl);
-  program = new Program(gl, {
+  sProgram = new Program(gl, {
     vertex,
     fragment,
     uniforms: {
       iTime: { value: 0 },
       iResolution: { value: new Float32Array([1, 1]) },
-      uTimeSpeed: { value: props.timeSpeed },
-      uColorBalance: { value: props.colorBalance },
-      uWarpStrength: { value: props.warpStrength },
-      uWarpFrequency: { value: props.warpFrequency },
-      uWarpSpeed: { value: props.warpSpeed },
-      uWarpAmplitude: { value: props.warpAmplitude },
-      uBlendAngle: { value: props.blendAngle },
-      uBlendSoftness: { value: props.blendSoftness },
-      uRotationAmount: { value: props.rotationAmount },
-      uNoiseScale: { value: props.noiseScale },
-      uGrainAmount: { value: props.grainAmount },
-      uGrainScale: { value: props.grainScale },
-      uGrainAnimated: { value: props.grainAnimated ? 1.0 : 0.0 },
-      uContrast: { value: props.contrast },
-      uGamma: { value: props.gamma },
-      uSaturation: { value: props.saturation },
-      uCenterOffset: { value: new Float32Array([props.centerX, props.centerY]) },
-      uZoom: { value: props.zoom },
-      uColor1: { value: new Float32Array(hexToRgb(props.color1)) },
-      uColor2: { value: new Float32Array(hexToRgb(props.color2)) },
-      uColor3: { value: new Float32Array(hexToRgb(props.color3)) },
+      uTimeSpeed: { value: 0.25 },
+      uColorBalance: { value: 0 },
+      uWarpStrength: { value: 1 },
+      uWarpFrequency: { value: 5 },
+      uWarpSpeed: { value: 2 },
+      uWarpAmplitude: { value: 50 },
+      uBlendAngle: { value: 0 },
+      uBlendSoftness: { value: 0.05 },
+      uRotationAmount: { value: 500 },
+      uNoiseScale: { value: 2 },
+      uGrainAmount: { value: 0.1 },
+      uGrainScale: { value: 2 },
+      uGrainAnimated: { value: 0 },
+      uContrast: { value: 1.5 },
+      uGamma: { value: 1 },
+      uSaturation: { value: 1 },
+      uCenterOffset: { value: new Float32Array([0, 0]) },
+      uZoom: { value: 0.9 },
+      uColor1: { value: new Float32Array([1, 0.625, 0.988]) },
+      uColor2: { value: new Float32Array([0.322, 0.153, 1]) },
+      uColor3: { value: new Float32Array([0.706, 0.592, 0.812]) },
     },
   });
 
-  mesh = new Mesh(gl, { geometry, program });
+  sMesh = new Mesh(gl, { geometry, program: sProgram });
 
-  const setSize = () => {
-    const rect = container.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
-    renderer!.setSize(w, h);
-    const res = program!.uniforms.iResolution.value as Float32Array;
-    res[0] = gl.drawingBufferWidth;
-    res[1] = gl.drawingBufferHeight;
-    renderer!.render({ scene: mesh! });
-  };
+  window.addEventListener('resize', sSetSize);
 
-  const ro = new ResizeObserver(setSize);
-  ro.observe(container);
-  cleanupFns.push(() => ro.disconnect());
-  setSize();
+  sT0 = performance.now();
+  syncUniforms();
+  sSetSize();
+  sStart();
+}
 
-  t0 = performance.now();
+function releaseShared() {
+  sCount--;
+  if (sCanvas && sContainer && sCanvas.parentNode === sContainer) {
+    try { sContainer.removeChild(sCanvas); } catch {}
+  }
+  sContainer = null;
+  if (sCount <= 0) {
+    sStop();
+  }
+}
 
-  const loop = (t: number) => {
-    program!.uniforms.iTime.value = (t - t0) * 0.001;
-    renderer!.render({ scene: mesh! });
-    raf = requestAnimationFrame(loop);
-  };
+function syncUniforms() {
+  if (!sProgram) return;
+  const u = sProgram.uniforms;
+  u.uTimeSpeed.value = props.timeSpeed;
+  u.uColorBalance.value = props.colorBalance;
+  u.uWarpStrength.value = props.warpStrength;
+  u.uWarpFrequency.value = props.warpFrequency;
+  u.uWarpSpeed.value = props.warpSpeed;
+  u.uWarpAmplitude.value = props.warpAmplitude;
+  u.uBlendAngle.value = props.blendAngle;
+  u.uBlendSoftness.value = props.blendSoftness;
+  u.uRotationAmount.value = props.rotationAmount;
+  u.uNoiseScale.value = props.noiseScale;
+  u.uGrainAmount.value = props.grainAmount;
+  u.uGrainScale.value = props.grainScale;
+  u.uGrainAnimated.value = props.grainAnimated ? 1.0 : 0.0;
+  u.uContrast.value = props.contrast;
+  u.uGamma.value = props.gamma;
+  u.uSaturation.value = props.saturation;
+  (u.uCenterOffset.value as Float32Array)[0] = props.centerX;
+  (u.uCenterOffset.value as Float32Array)[1] = props.centerY;
+  u.uZoom.value = props.zoom;
+  const c1 = hexToRgb(props.color1);
+  const c2 = hexToRgb(props.color2);
+  const c3 = hexToRgb(props.color3);
+  const arr1 = u.uColor1.value as Float32Array;
+  const arr2 = u.uColor2.value as Float32Array;
+  const arr3 = u.uColor3.value as Float32Array;
+  arr1[0] = c1[0]; arr1[1] = c1[1]; arr1[2] = c1[2];
+  arr2[0] = c2[0]; arr2[1] = c2[1]; arr2[2] = c2[2];
+  arr3[0] = c3[0]; arr3[1] = c3[1]; arr3[2] = c3[2];
+}
 
-  const tryStart = () => {
-    if (isVisible && isPageVisible && raf === 0) raf = requestAnimationFrame(loop);
-  };
-  const tryStop = () => {
-    if (raf !== 0) { cancelAnimationFrame(raf); raf = 0; }
-  };
+const containerRef = ref<HTMLElement | null>(null);
+let io: IntersectionObserver | null = null;
 
-  const io = new IntersectionObserver(
+onMounted(() => {
+  const container = containerRef.value;
+  if (!container) return;
+
+  initShared(container);
+
+  io = new IntersectionObserver(
     ([entry]) => {
-      isVisible = entry.isIntersecting;
-      isVisible ? tryStart() : tryStop();
+      sVisible = entry.isIntersecting;
+      sVisible ? sStart() : sStop();
     },
     { threshold: 0 }
   );
   io.observe(container);
-  cleanupFns.push(() => io.disconnect());
-
-  const onVisibility = () => {
-    isPageVisible = !document.hidden;
-    isPageVisible ? tryStart() : tryStop();
-  };
-  document.addEventListener('visibilitychange', onVisibility);
-  cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibility));
-
-  tryStart();
-}
-
-onMounted(() => {
-  build();
 });
 
 onUnmounted(() => {
-  if (raf !== 0) { cancelAnimationFrame(raf); raf = 0; }
-  cleanupFns.forEach(fn => fn());
-  cleanupFns = [];
-  if (renderer) {
-    try { renderer.gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
-    renderer = null;
-    program = null;
-    mesh = null;
-  }
+  if (io) { io.disconnect(); io = null; }
+  releaseShared();
 });
 
-// Watch props and sync to uniforms
 watch(
   () => [
     props.timeSpeed, props.colorBalance, props.warpStrength, props.warpFrequency,
@@ -300,38 +357,7 @@ watch(
     props.grainAnimated, props.contrast, props.gamma, props.saturation,
     props.centerX, props.centerY, props.zoom, props.color1, props.color2, props.color3,
   ],
-  () => {
-    if (!program) return;
-    const u = program.uniforms;
-    u.uTimeSpeed.value = props.timeSpeed;
-    u.uColorBalance.value = props.colorBalance;
-    u.uWarpStrength.value = props.warpStrength;
-    u.uWarpFrequency.value = props.warpFrequency;
-    u.uWarpSpeed.value = props.warpSpeed;
-    u.uWarpAmplitude.value = props.warpAmplitude;
-    u.uBlendAngle.value = props.blendAngle;
-    u.uBlendSoftness.value = props.blendSoftness;
-    u.uRotationAmount.value = props.rotationAmount;
-    u.uNoiseScale.value = props.noiseScale;
-    u.uGrainAmount.value = props.grainAmount;
-    u.uGrainScale.value = props.grainScale;
-    u.uGrainAnimated.value = props.grainAnimated ? 1.0 : 0.0;
-    u.uContrast.value = props.contrast;
-    u.uGamma.value = props.gamma;
-    u.uSaturation.value = props.saturation;
-    (u.uCenterOffset.value as Float32Array)[0] = props.centerX;
-    (u.uCenterOffset.value as Float32Array)[1] = props.centerY;
-    u.uZoom.value = props.zoom;
-    const c1 = hexToRgb(props.color1);
-    const c2 = hexToRgb(props.color2);
-    const c3 = hexToRgb(props.color3);
-    const arr1 = u.uColor1.value as Float32Array;
-    const arr2 = u.uColor2.value as Float32Array;
-    const arr3 = u.uColor3.value as Float32Array;
-    arr1[0] = c1[0]; arr1[1] = c1[1]; arr1[2] = c1[2];
-    arr2[0] = c2[0]; arr2[1] = c2[1]; arr2[2] = c2[2];
-    arr3[0] = c3[0]; arr3[1] = c3[1]; arr3[2] = c3[2];
-  },
+  syncUniforms,
   { deep: true }
 );
 </script>
