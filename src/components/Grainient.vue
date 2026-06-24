@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 
 const props = withDefaults(defineProps<{
@@ -50,6 +50,15 @@ const props = withDefaults(defineProps<{
   centerY: 0.0,
   zoom: 0.9,
   className: '',
+});
+
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+const cssGradientStyle = computed(() => {
+  if (!isMobile) return {};
+  return {
+    background: `linear-gradient(135deg, ${props.color1} 0%, ${props.color2} 50%, ${props.color3} 100%)`,
+  };
 });
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -329,6 +338,12 @@ watch(
 
 <template>
   <div
+    v-if="isMobile"
+    :class="['grainient-container', className].filter(Boolean).join(' ')"
+    :style="cssGradientStyle"
+  />
+  <div
+    v-else
     ref="containerRef"
     :class="['grainient-container', className].filter(Boolean).join(' ')"
   />
