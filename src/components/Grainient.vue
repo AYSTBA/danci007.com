@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch, computed } from 'vue';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+import { useDevice } from '../composables/useDevice';
 
 const props = withDefaults(defineProps<{
   color1?: string;
@@ -52,7 +53,7 @@ const props = withDefaults(defineProps<{
   className: '',
 });
 
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+const { isMobile } = useDevice();
 
 const cssGradientStyle = computed(() => ({
   background: `linear-gradient(135deg, ${props.color1} 0%, ${props.color2} 50%, ${props.color3} 100%)`,
