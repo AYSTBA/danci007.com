@@ -91,6 +91,7 @@ onMounted(checkLogin);
 </script>
 
 <template>
+  <div class="admin-root">
   <Grainient
     color1="#c1c2c1"
     color2="#6ad67b"
@@ -241,9 +242,15 @@ onMounted(checkLogin);
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.admin-root {
+  position: relative;
+  min-height: 100vh;
+}
+
 .server-page {
   min-height: 100vh;
   background: transparent;
@@ -314,9 +321,9 @@ td:last-child { color: #333; }
 .bar-gpu { background: #f57c00; }
 .percent { font-size: 12px; color: #888; margin-top: 4px; text-align: right; }
 
-/* ══════════════════════════════════════════════
-   Page background
-   ══════════════════════════════════════════════ */
+</style>
+
+<style>
 .page-bg {
   position: fixed;
   top: 0; left: 0;

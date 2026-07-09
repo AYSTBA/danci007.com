@@ -314,6 +314,7 @@ watch(() => route.query.refresh, () => {
 </script>
 
 <template>
+  <div class="admin-root">
   <Grainient
     color1="#c1c2c1"
     color2="#6ad67b"
@@ -734,9 +735,15 @@ watch(() => route.query.refresh, () => {
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.admin-root {
+  position: relative;
+  min-height: 100vh;
+}
+
 .admin-visits-page { min-height: 100vh; background: transparent; position: relative; z-index: 1; }
 
 .page-header { background: rgba(255,255,255,0.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 1.2rem 0; position: sticky; top: 0; z-index: 100; }
@@ -926,9 +933,9 @@ watch(() => route.query.refresh, () => {
   .visit-table { min-width: 800px; }
 }
 
-/* ══════════════════════════════════════════════
-   Page background
-   ══════════════════════════════════════════════ */
+</style>
+
+<style>
 .page-bg {
   position: fixed;
   top: 0; left: 0;

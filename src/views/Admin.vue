@@ -737,6 +737,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="admin-root">
   <Grainient
     color1="#c1c2c1"
     color2="#6ad67b"
@@ -1330,9 +1331,15 @@ onMounted(() => {
       />
     </template>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.admin-root {
+  position: relative;
+  min-height: 100vh;
+}
+
 :root {
   --card-bg: #fff;
   --hover-bg: #f5f5f7;
@@ -1684,17 +1691,6 @@ onMounted(() => {
   .filter-row input, .filter-row select { min-width: 0; flex: 1; }
 }
 
-/* ══════════════════════════════════════════════
-   Page background
-   ══════════════════════════════════════════════ */
-.page-bg {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-
 /* ── 团购树状图 ── */
 .gb-tree-node {
   background: var(--card-bg);
@@ -1741,5 +1737,15 @@ onMounted(() => {
   .gb-tree-meta { width: 100%; order: 10; }
   .gb-tree-leaf { padding: 10px 12px; gap: 8px; }
   .gb-leaf-contact { min-width: 120px; }
+}
+</style>
+
+<style>
+.page-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 </style>

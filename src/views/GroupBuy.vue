@@ -256,7 +256,7 @@ function hasJoined() {
                       <span class="gb-pcontact" v-if="p.user_phone">📞 {{ p.user_phone }}</span>
                       <span class="gb-pcontact" v-if="p.user_email">✉️ {{ p.user_email }}</span>
                     </div>
-                    <span class="gb-ptime">{{ p.joined_at.slice(0, 16).replace('T', ' ') }}</span>
+                    <span class="gb-ptime">{{ (p.joined_at || '').slice(0, 16).replace('T', ' ') }}</span>
                   </div>
                 </div>
               </div>
@@ -271,7 +271,7 @@ function hasJoined() {
             <div v-if="userSessions?.created?.length" class="gb-list-section">
               <h3 class="gb-list-title">{{ isZh ? '我创建的团购' : 'My Created' }} ({{ userSessions.created.length }})</h3>
               <div v-for="s in userSessions.created" :key="s.id" class="gb-session-row" @click="viewSession(s)">
-                <span class="gb-session-id">{{ s.share_id.slice(0, 8) }}...</span>
+                <span class="gb-session-id">{{ (s.share_id || '').slice(0, 8) }}...</span>
                 <span class="gb-session-meta">👥 {{ s.participant_count }} / 🎁 +{{ s.total_bonus || 0 }}</span>
               </div>
             </div>
@@ -279,7 +279,7 @@ function hasJoined() {
             <div v-if="userSessions?.joined?.length" class="gb-list-section">
               <h3 class="gb-list-title">{{ isZh ? '我加入的团购' : 'My Joined' }} ({{ userSessions.joined.length }})</h3>
               <div v-for="s in userSessions.joined" :key="s.id" class="gb-session-row" @click="viewSession(s)">
-                <span class="gb-session-id">{{ s.creator_name }} → {{ s.share_id.slice(0, 8) }}...</span>
+                <span class="gb-session-id">{{ s.creator_name }} → {{ (s.share_id || '').slice(0, 8) }}...</span>
                 <span class="gb-session-meta">👥 {{ s.participant_count }}</span>
               </div>
             </div>
